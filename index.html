@@ -9,6 +9,7 @@
   <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -33,6 +34,10 @@
 
   <script type="text/babel">
     const { useState, useEffect } = React;
+
+    const SUPABASE_URL = "https://cleduaakmebcnldqeaoo.supabase.co";
+    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNsZWR1YWFrbWViY25sZHFlYW9vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMyMjYxMzgsImV4cCI6MjEwODgwMjEzOH0.Wl1DsflvOJLNDCaCjdNyaGe91KpCH7zpqZGJVDOpH2s";
+    const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
     const DEFAULT_CONFIG = {
       storeName: "L&V HOGAR",
@@ -90,20 +95,36 @@
       const [quantities, setQuantities] = useState({});
       const [chosenVariant, setChosenVariant] = useState({});
 
-      // Cargar productos automáticamente desde el archivo productos.json en la nube de GitHub
+      const fetchProductsFromSupabase = async () => {
+        try {
+          const { data, error } = await supabaseClient
+            .from('productos')
+            .select('*')
+            .order('id', { ascending: false });
+
+          if (error) throw error;
+          setProducts(data || []);
+        } catch (err) {
+          console.error("Error al obtener productos desde Supabase:", err);
+        } finally {
+          setLoadingProducts(false);
+        }
+      };
+
       useEffect(() => {
-        fetch('productos.json?' + new Date().getTime()) // Evita caché
-          .then(res => res.json())
-          .then(data => {
-            setProducts(data);
-            setLoadingProducts(false);
+        fetchProductsFromSupabase();
+
+        // Escuchar actualizaciones en tiempo real
+        const channel = supabaseClient
+          .channel('schema-db-changes')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'productos' }, () => {
+            fetchProductsFromSupabase();
           })
-          .catch(err => {
-            console.error("Error al cargar productos.json, usando respaldo local", err);
-            const fallback = JSON.parse(localStorage.getItem('lv_products')) || [];
-            setProducts(fallback);
-            setLoadingProducts(false);
-          });
+          .subscribe();
+
+        return () => {
+          supabaseClient.removeChannel(channel);
+        };
       }, []);
 
       const primaryColor = config.brandColor || '#768C77';
@@ -127,9 +148,9 @@
           const queryLower = userText.toLowerCase();
           let botReply = "";
           const matchedProducts = products.filter(p => 
-            p.title.toLowerCase().includes(queryLower) || 
-            p.description.toLowerCase().includes(queryLower) ||
-            p.category.toLowerCase().includes(queryLower)
+            p.title?.toLowerCase().includes(queryLower) || 
+            p.description?.toLowerCase().includes(queryLower) ||
+            p.category?.toLowerCase().includes(queryLower)
           );
 
           if (queryLower.includes('envio') || queryLower.includes('entrega') || queryLower.includes('zona')) {
@@ -137,7 +158,7 @@
           } else if (queryLower.includes('pago') || queryLower.includes('tarjeta') || queryLower.includes('transferencia')) {
             botReply = `Aceptamos: ${config.paymentMethods || 'Efectivo, Transferencia Bancaria y Mercado Pago'}.`;
           } else if (matchedProducts.length > 0) {
-            const prodListStr = matchedProducts.slice(0, 3).map(p => `• ${p.title} - $${p.price.toLocaleString('es-AR')}`).join('\n');
+            const prodListStr = matchedProducts.slice(0, 3).map(p => `• ${p.title} - $${Number(p.price).toLocaleString('es-AR')}`).join('\n');
             botReply = `Encontré estas opciones en nuestro catálogo:\n\n${prodListStr}\n\n¿Te gustaría ver alguno en detalle?`;
           } else {
             botReply = `¡Gracias por consultar! Contamos con una amplia variedad en artículos para el hogar y cuidado personal. Si quieres atención directa, escríbenos por WhatsApp al ${config.whatsappNumber}.`;
@@ -192,7 +213,7 @@
 
       const removeFromCart = (cartItemId) => setCart(prev => prev.filter(item => item.cartItemId !== cartItemId));
 
-      const getSubtotal = () => cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+      const getSubtotal = () => cart.reduce((sum, item) => sum + (Number(item.price) * item.qty), 0);
       const getDeliveryCost = () => {
         if (fulfillmentType === 'pickup') return 0;
         return config.deliveryZones ? config.deliveryZones[selectedDeliveryZone].price : 0;
@@ -202,12 +223,12 @@
       const handleSingleProductWhatsApp = (product) => {
         const varString = (product.variants && product.variants.trim()) ? ` (Opción: ${chosenVariant[product.id] || product.variants.split(',')[0].trim()})` : '';
         const skuStr = product.sku ? ` [SKU: ${product.sku}]` : '';
-        const message = `¡Hola ${config.storeName}! Me interesa consultar por este producto:\n\n• *${product.title}*${skuStr}${varString} - $${product.price.toLocaleString('es-AR')}\n\n¿Hay stock disponible?`;
+        const message = `¡Hola ${config.storeName}! Me interesa consultar por este producto:\n\n• *${product.title}*${skuStr}${varString} - $${Number(product.price).toLocaleString('es-AR')}\n\n¿Hay stock disponible?`;
         window.open(`https://wa.me/${config.whatsappNumber}?text=${encodeURIComponent(message)}`, '_blank');
       };
 
       const handleShareProduct = (product) => {
-        const text = `¡Mirá este producto de ${config.storeName}!\n*${product.title}* - $${product.price.toLocaleString('es-AR')}\n${product.description}`;
+        const text = `¡Mirá este producto de ${config.storeName}!\n*${product.title}* - $${Number(product.price).toLocaleString('es-AR')}\n${product.description}`;
         if (navigator.share) {
           navigator.share({ title: product.title, text: text, url: window.location.href }).catch(() => {});
         } else {
@@ -220,7 +241,7 @@
         cart.forEach(item => {
           const varText = item.selectedVariant ? ` [${item.selectedVariant}]` : '';
           const skuText = item.sku ? ` (SKU: ${item.sku})` : '';
-          message += `• *${item.title}*${skuText}${varText} x${item.qty} - $${(item.price * item.qty).toLocaleString('es-AR')}\n`;
+          message += `• *${item.title}*${skuText}${varText} x${item.qty} - $${(Number(item.price) * item.qty).toLocaleString('es-AR')}\n`;
         });
 
         message += `\n*Subtotal:* $${getSubtotal().toLocaleString('es-AR')}`;
@@ -267,13 +288,13 @@
       
       const filteredProducts = products.filter(p => {
         const matchesCat = selectedCategory === 'Todos' || p.category === selectedCategory;
-        const matchesSearch = p.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                              p.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        const matchesSearch = p.title?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                              p.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
                               (p.sku && p.sku.toLowerCase().includes(searchQuery.toLowerCase()));
         return matchesCat && matchesSearch;
       }).sort((a, b) => {
-        if (sortBy === 'low-high') return a.price - b.price;
-        if (sortBy === 'high-low') return b.price - a.price;
+        if (sortBy === 'low-high') return Number(a.price) - Number(b.price);
+        if (sortBy === 'high-low') return Number(b.price) - Number(a.price);
         return 0;
       });
 
@@ -376,12 +397,14 @@
             {loadingProducts ? (
               <div className="text-center py-20 text-gray-500">
                 <i className="fa-solid fa-spinner animate-spin text-2xl mb-2"></i>
-                <p>Cargando catálogo actualizado...</p>
+                <p>Cargando productos en tiempo real...</p>
               </div>
+            ) : filteredProducts.length === 0 ? (
+              <div className="text-center py-20 text-gray-400">No se encontraron productos disponibles.</div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                 {filteredProducts.map(product => {
-                  const isAvailable = product.stock > 0;
+                  const isAvailable = Number(product.stock) > 0;
                   const currentQty = quantities[product.id] || 1;
                   const hasVariants = product.variants && product.variants.trim().length > 0;
                   const variantsList = hasVariants ? product.variants.split(',').map(v => v.trim()) : [];
@@ -391,17 +414,7 @@
                     <div key={product.id} className={`bg-white transition overflow-hidden border border-gray-200 flex flex-col justify-between ${cardRadius}`}>
                       <div>
                         <div className="relative h-52 bg-gray-100 overflow-hidden cursor-pointer group" onClick={() => setSelectedProductModal(product)}>
-                          <img src={product.image} alt={product.title} className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
-                          {product.badge && (
-                            <span style={{ backgroundColor: secondaryColor }} className="absolute top-3 left-3 text-black text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full shadow">
-                              {product.badge}
-                            </span>
-                          )}
-                          {product.video && (
-                            <span style={{ backgroundColor: primaryColor }} className="absolute bottom-3 left-3 text-white text-[10px] px-2 py-0.5 rounded-md flex items-center gap-1 shadow">
-                              <i className="fa-solid fa-video"></i> Video
-                            </span>
-                          )}
+                          <img src={product.image || 'https://images.unsplash.com/photo-1583847268964-b28dc8f51f92?auto=format&fit=crop&w=600&q=80'} alt={product.title} className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
                           <span className={`absolute top-3 right-3 text-[10px] font-semibold px-2.5 py-0.5 rounded-full shadow ${
                             isAvailable ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'
                           }`}>
@@ -427,10 +440,7 @@
                       <div className="p-5 pt-0 space-y-3">
                         <div className="flex justify-between items-center">
                           <div>
-                            <span style={{ color: primaryColor }} className="text-lg font-serif font-bold">${product.price.toLocaleString('es-AR')}</span>
-                            {product.originalPrice && product.originalPrice > product.price && (
-                              <span className="text-xs text-gray-400 line-through ml-2">${product.originalPrice.toLocaleString('es-AR')}</span>
-                            )}
+                            <span style={{ color: primaryColor }} className="text-lg font-serif font-bold">${Number(product.price).toLocaleString('es-AR')}</span>
                           </div>
                           <button onClick={() => handleSingleProductWhatsApp(product)} style={{ color: primaryColor }} className="hover:opacity-80 text-xs font-semibold flex items-center gap-1 bg-gray-100 px-2.5 py-1.5 rounded-lg">
                             <i className="fa-brands fa-whatsapp text-sm"></i> Consultar
@@ -439,7 +449,7 @@
 
                         {hasVariants && (
                           <div className="space-y-1">
-                            <label className="block text-[11px] font-semibold text-gray-700">{product.variantsLabel || 'Variante'}:</label>
+                            <label className="block text-[11px] font-semibold text-gray-700">Variante:</label>
                             <select 
                               value={activeVariant}
                               onChange={(e) => handleVariantSelect(product.id, e.target.value)}
@@ -472,44 +482,6 @@
               </div>
             )}
           </main>
-
-          {selectedProductModal && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
-              <div className="bg-white rounded-2xl max-w-lg w-full overflow-hidden shadow-2xl border border-gray-200 max-h-[90vh] overflow-y-auto">
-                {selectedProductModal.video ? (
-                  <div className="relative bg-black">
-                    <video src={selectedProductModal.video} controls autoPlay className="w-full h-64 object-contain"></video>
-                    <button onClick={() => setSelectedProductModal(null)} className="absolute top-3 right-3 bg-black/60 text-white w-8 h-8 rounded-full flex items-center justify-center">
-                      <i className="fa-solid fa-xmark"></i>
-                    </button>
-                  </div>
-                ) : (
-                  <div className="relative h-64 bg-gray-100">
-                    <img src={selectedProductModal.image} alt={selectedProductModal.title} className="w-full h-full object-cover" />
-                    <button onClick={() => setSelectedProductModal(null)} className="absolute top-3 right-3 bg-black/60 text-white w-8 h-8 rounded-full flex items-center justify-center">
-                      <i className="fa-solid fa-xmark"></i>
-                    </button>
-                  </div>
-                )}
-
-                <div className="p-6 space-y-4">
-                  <span style={{ color: primaryColor }} className="text-[10px] font-semibold uppercase tracking-widest">{selectedProductModal.category}</span>
-                  <h3 className="text-xl font-serif font-bold text-gray-800">{selectedProductModal.title}</h3>
-                  <p style={{ color: primaryColor }} className="text-2xl font-serif font-bold">${selectedProductModal.price.toLocaleString('es-AR')}</p>
-                  <p className="text-xs text-gray-600 font-light leading-relaxed">{selectedProductModal.description}</p>
-                  
-                  <div className="border-t pt-4 flex gap-3">
-                    <button onClick={() => { handleSingleProductWhatsApp(selectedProductModal); setSelectedProductModal(null); }} className="flex-1 bg-emerald-700 text-white text-xs font-medium py-3 rounded-xl flex items-center justify-center gap-2">
-                      <i className="fa-brands fa-whatsapp"></i> Consultar WhatsApp
-                    </button>
-                    <button onClick={() => { addToCart(selectedProductModal); setSelectedProductModal(null); }} style={{ backgroundColor: primaryColor }} className="flex-1 text-white text-xs font-medium py-3 rounded-xl flex items-center justify-center gap-2">
-                      <i className="fa-solid fa-bag-shopping"></i> Agregar
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
 
           <div className="fixed bottom-6 right-6 flex flex-col gap-3 z-40">
             <button 
@@ -598,7 +570,7 @@
                             <div>
                               <p className="font-serif font-bold text-gray-800">{item.title}</p>
                               {item.selectedVariant && <p className="text-[10px] text-gray-500">Opción: {item.selectedVariant}</p>}
-                              <p className="text-gray-500">${item.price.toLocaleString('es-AR')}</p>
+                              <p className="text-gray-500">${Number(item.price).toLocaleString('es-AR')}</p>
                             </div>
                           </div>
                           <div className="flex items-center gap-2">
@@ -672,9 +644,6 @@
 
                     <button onClick={handleCheckoutWhatsApp} style={{ backgroundColor: primaryColor }} className="w-full text-white font-medium py-2.5 rounded-xl flex items-center justify-center gap-2 shadow">
                       <i className="fa-brands fa-whatsapp text-lg"></i> Confirmar Pedido por WhatsApp
-                    </button>
-                    <button onClick={handleCopyOrder} className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-2 rounded-xl flex items-center justify-center gap-2 border">
-                      <i className="fa-solid fa-copy"></i> {copySuccess ? '¡Copiado!' : 'Copiar Resumen'}
                     </button>
                   </div>
                 )}
