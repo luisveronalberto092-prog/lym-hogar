@@ -59,42 +59,10 @@
       ]
     };
 
-    const DEFAULT_PRODUCTS = [
-      {
-        id: 1,
-        sku: "LV-ESC-01",
-        title: "Escritorio Portátil Multiuso",
-        category: "Hogar",
-        price: 18500,
-        originalPrice: 22000,
-        stock: 12,
-        image: "https://images.unsplash.com/photo-1518455027359-f3f8164ba6bd?auto=format&fit=crop&w=600&q=80",
-        video: "",
-        description: "Escritorio plegable e ideal para trabajar o estudiar cómodamente desde el sofá o la cama.",
-        badge: "OFERTA",
-        variantsLabel: "Color",
-        variants: "Natural, Roble, Negro"
-      },
-      {
-        id: 2,
-        sku: "LV-DIF-02",
-        title: "Aroma Difusor Esencial",
-        category: "Aromas y Decoración",
-        price: 12900,
-        originalPrice: 15000,
-        stock: 8,
-        image: "https://images.unsplash.com/photo-1608571423902-eed4a5ad8108?auto=format&fit=crop&w=600&q=80",
-        video: "",
-        description: "Difusor ultrasónico con luces LED ambientales para aceites esenciales.",
-        badge: "NUEVO",
-        variantsLabel: "Capacidad (ml)",
-        variants: "200ml, 400ml, 500ml"
-      }
-    ];
-
     function CatalogApp() {
       const [config, setConfig] = useState(() => JSON.parse(localStorage.getItem('lv_config')) || DEFAULT_CONFIG);
-      const [products, setProducts] = useState(() => JSON.parse(localStorage.getItem('lv_products')) || DEFAULT_PRODUCTS);
+      const [products, setProducts] = useState([]);
+      const [loadingProducts, setLoadingProducts] = useState(true);
       
       const [cart, setCart] = useState([]);
       const [isCartOpen, setIsCartOpen] = useState(false);
@@ -122,19 +90,20 @@
       const [quantities, setQuantities] = useState({});
       const [chosenVariant, setChosenVariant] = useState({});
 
+      // Cargar productos automáticamente desde el archivo productos.json en la nube de GitHub
       useEffect(() => {
-        const syncData = () => {
-          const storedConfig = JSON.parse(localStorage.getItem('lv_config'));
-          const storedProducts = JSON.parse(localStorage.getItem('lv_products'));
-          if (storedConfig) setConfig(storedConfig);
-          if (storedProducts) setProducts(storedProducts);
-        };
-        window.addEventListener('storage', syncData);
-        const interval = setInterval(syncData, 1000);
-        return () => {
-          window.removeEventListener('storage', syncData);
-          clearInterval(interval);
-        };
+        fetch('productos.json?' + new Date().getTime()) // Evita caché
+          .then(res => res.json())
+          .then(data => {
+            setProducts(data);
+            setLoadingProducts(false);
+          })
+          .catch(err => {
+            console.error("Error al cargar productos.json, usando respaldo local", err);
+            const fallback = JSON.parse(localStorage.getItem('lv_products')) || [];
+            setProducts(fallback);
+            setLoadingProducts(false);
+          });
       }, []);
 
       const primaryColor = config.brandColor || '#768C77';
@@ -404,97 +373,104 @@
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              {filteredProducts.map(product => {
-                const isAvailable = product.stock > 0;
-                const currentQty = quantities[product.id] || 1;
-                const hasVariants = product.variants && product.variants.trim().length > 0;
-                const variantsList = hasVariants ? product.variants.split(',').map(v => v.trim()) : [];
-                const activeVariant = chosenVariant[product.id] || (variantsList.length > 0 ? variantsList[0] : '');
+            {loadingProducts ? (
+              <div className="text-center py-20 text-gray-500">
+                <i className="fa-solid fa-spinner animate-spin text-2xl mb-2"></i>
+                <p>Cargando catálogo actualizado...</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                {filteredProducts.map(product => {
+                  const isAvailable = product.stock > 0;
+                  const currentQty = quantities[product.id] || 1;
+                  const hasVariants = product.variants && product.variants.trim().length > 0;
+                  const variantsList = hasVariants ? product.variants.split(',').map(v => v.trim()) : [];
+                  const activeVariant = chosenVariant[product.id] || (variantsList.length > 0 ? variantsList[0] : '');
 
-                return (
-                  <div key={product.id} className={`bg-white transition overflow-hidden border border-gray-200 flex flex-col justify-between ${cardRadius}`}>
-                    <div>
-                      <div className="relative h-52 bg-gray-100 overflow-hidden cursor-pointer group" onClick={() => setSelectedProductModal(product)}>
-                        <img src={product.image} alt={product.title} className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
-                        {product.badge && (
-                          <span style={{ backgroundColor: secondaryColor }} className="absolute top-3 left-3 text-black text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full shadow">
-                            {product.badge}
-                          </span>
-                        )}
-                        {product.video && (
-                          <span style={{ backgroundColor: primaryColor }} className="absolute bottom-3 left-3 text-white text-[10px] px-2 py-0.5 rounded-md flex items-center gap-1 shadow">
-                            <i className="fa-solid fa-video"></i> Video
-                          </span>
-                        )}
-                        <span className={`absolute top-3 right-3 text-[10px] font-semibold px-2.5 py-0.5 rounded-full shadow ${
-                          isAvailable ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'
-                        }`}>
-                          {isAvailable ? 'Disponible' : 'Agotado'}
-                        </span>
-                      </div>
-
-                      <div className="p-5">
-                        <div className="flex justify-between items-start">
-                          <span style={{ color: primaryColor }} className="text-[10px] font-semibold uppercase tracking-widest">{product.category}</span>
-                          <button onClick={() => handleShareProduct(product)} className="text-gray-400 hover:text-gray-600 text-xs">
-                            <i className="fa-solid fa-share-nodes"></i>
-                          </button>
-                        </div>
-                        <h3 className="font-serif text-base text-gray-800 mt-1 cursor-pointer hover:opacity-80 transition" onClick={() => setSelectedProductModal(product)}>
-                          {product.title}
-                        </h3>
-                        {product.sku && <p className="text-[10px] text-gray-400 font-mono">SKU: {product.sku}</p>}
-                        <p className="text-gray-500 text-xs mt-2 font-light line-clamp-2">{product.description}</p>
-                      </div>
-                    </div>
-
-                    <div className="p-5 pt-0 space-y-3">
-                      <div className="flex justify-between items-center">
-                        <div>
-                          <span style={{ color: primaryColor }} className="text-lg font-serif font-bold">${product.price.toLocaleString('es-AR')}</span>
-                          {product.originalPrice && product.originalPrice > product.price && (
-                            <span className="text-xs text-gray-400 line-through ml-2">${product.originalPrice.toLocaleString('es-AR')}</span>
+                  return (
+                    <div key={product.id} className={`bg-white transition overflow-hidden border border-gray-200 flex flex-col justify-between ${cardRadius}`}>
+                      <div>
+                        <div className="relative h-52 bg-gray-100 overflow-hidden cursor-pointer group" onClick={() => setSelectedProductModal(product)}>
+                          <img src={product.image} alt={product.title} className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
+                          {product.badge && (
+                            <span style={{ backgroundColor: secondaryColor }} className="absolute top-3 left-3 text-black text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full shadow">
+                              {product.badge}
+                            </span>
                           )}
+                          {product.video && (
+                            <span style={{ backgroundColor: primaryColor }} className="absolute bottom-3 left-3 text-white text-[10px] px-2 py-0.5 rounded-md flex items-center gap-1 shadow">
+                              <i className="fa-solid fa-video"></i> Video
+                            </span>
+                          )}
+                          <span className={`absolute top-3 right-3 text-[10px] font-semibold px-2.5 py-0.5 rounded-full shadow ${
+                            isAvailable ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'
+                          }`}>
+                            {isAvailable ? 'Disponible' : 'Agotado'}
+                          </span>
                         </div>
-                        <button onClick={() => handleSingleProductWhatsApp(product)} style={{ color: primaryColor }} className="hover:opacity-80 text-xs font-semibold flex items-center gap-1 bg-gray-100 px-2.5 py-1.5 rounded-lg">
-                          <i className="fa-brands fa-whatsapp text-sm"></i> Consultar
-                        </button>
+
+                        <div className="p-5">
+                          <div className="flex justify-between items-start">
+                            <span style={{ color: primaryColor }} className="text-[10px] font-semibold uppercase tracking-widest">{product.category}</span>
+                            <button onClick={() => handleShareProduct(product)} className="text-gray-400 hover:text-gray-600 text-xs">
+                              <i className="fa-solid fa-share-nodes"></i>
+                            </button>
+                          </div>
+                          <h3 className="font-serif text-base text-gray-800 mt-1 cursor-pointer hover:opacity-80 transition" onClick={() => setSelectedProductModal(product)}>
+                            {product.title}
+                          </h3>
+                          {product.sku && <p className="text-[10px] text-gray-400 font-mono">SKU: {product.sku}</p>}
+                          <p className="text-gray-500 text-xs mt-2 font-light line-clamp-2">{product.description}</p>
+                        </div>
                       </div>
 
-                      {hasVariants && (
-                        <div className="space-y-1">
-                          <label className="block text-[11px] font-semibold text-gray-700">{product.variantsLabel || 'Variante'}:</label>
-                          <select 
-                            value={activeVariant}
-                            onChange={(e) => handleVariantSelect(product.id, e.target.value)}
-                            className="w-full p-2 bg-gray-100 border border-gray-200 rounded-xl text-xs text-gray-700"
-                          >
-                            {variantsList.map((v, idx) => (<option key={idx} value={v}>{v}</option>))}
-                          </select>
-                        </div>
-                      )}
-
-                      {isAvailable ? (
-                        <div className="flex items-center justify-between bg-gray-100 p-1 rounded-xl border border-gray-200">
-                          <div className="flex items-center gap-2 px-2">
-                            <span className="text-[11px] text-gray-500">Cant:</span>
-                            <button onClick={() => handleQtyChange(product.id, -1)} className="w-6 h-6 bg-white rounded-md font-bold text-gray-600 shadow-xs">-</button>
-                            <span className="text-xs font-bold w-4 text-center">{currentQty}</span>
-                            <button onClick={() => handleQtyChange(product.id, 1)} className="w-6 h-6 bg-white rounded-md font-bold text-gray-600 shadow-xs">+</button>
+                      <div className="p-5 pt-0 space-y-3">
+                        <div className="flex justify-between items-center">
+                          <div>
+                            <span style={{ color: primaryColor }} className="text-lg font-serif font-bold">${product.price.toLocaleString('es-AR')}</span>
+                            {product.originalPrice && product.originalPrice > product.price && (
+                              <span className="text-xs text-gray-400 line-through ml-2">${product.originalPrice.toLocaleString('es-AR')}</span>
+                            )}
                           </div>
-                          <button onClick={() => addToCart(product)} style={{ backgroundColor: primaryColor }} className="text-white px-3 py-1.5 rounded-lg font-medium text-xs shadow-xs hover:opacity-90">
-                            Agregar
+                          <button onClick={() => handleSingleProductWhatsApp(product)} style={{ color: primaryColor }} className="hover:opacity-80 text-xs font-semibold flex items-center gap-1 bg-gray-100 px-2.5 py-1.5 rounded-lg">
+                            <i className="fa-brands fa-whatsapp text-sm"></i> Consultar
                           </button>
                         </div>
-                      ) : (
-                        <button disabled className="w-full bg-gray-200 text-gray-400 font-medium text-xs py-2 rounded-xl cursor-not-allowed">Agotado</button>
-                      )}
+
+                        {hasVariants && (
+                          <div className="space-y-1">
+                            <label className="block text-[11px] font-semibold text-gray-700">{product.variantsLabel || 'Variante'}:</label>
+                            <select 
+                              value={activeVariant}
+                              onChange={(e) => handleVariantSelect(product.id, e.target.value)}
+                              className="w-full p-2 bg-gray-100 border border-gray-200 rounded-xl text-xs text-gray-700"
+                            >
+                              {variantsList.map((v, idx) => (<option key={idx} value={v}>{v}</option>))}
+                            </select>
+                          </div>
+                        )}
+
+                        {isAvailable ? (
+                          <div className="flex items-center justify-between bg-gray-100 p-1 rounded-xl border border-gray-200">
+                            <div className="flex items-center gap-2 px-2">
+                              <span className="text-[11px] text-gray-500">Cant:</span>
+                              <button onClick={() => handleQtyChange(product.id, -1)} className="w-6 h-6 bg-white rounded-md font-bold text-gray-600 shadow-xs">-</button>
+                              <span className="text-xs font-bold w-4 text-center">{currentQty}</span>
+                              <button onClick={() => handleQtyChange(product.id, 1)} className="w-6 h-6 bg-white rounded-md font-bold text-gray-600 shadow-xs">+</button>
+                            </div>
+                            <button onClick={() => addToCart(product)} style={{ backgroundColor: primaryColor }} className="text-white px-3 py-1.5 rounded-lg font-medium text-xs shadow-xs hover:opacity-90">
+                              Agregar
+                            </button>
+                          </div>
+                        ) : (
+                          <button disabled className="w-full bg-gray-200 text-gray-400 font-medium text-xs py-2 rounded-xl cursor-not-allowed">Agotado</button>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            )}
           </main>
 
           {selectedProductModal && (
