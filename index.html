@@ -14,9 +14,6 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&family=Playfair+Display:wght@500;600;700&family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
 
-  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
-
   <script>
     tailwind.config = {
       theme: {
@@ -37,20 +34,6 @@
   <script type="text/babel">
     const { useState, useEffect } = React;
 
-    const firebaseConfig = {
-      apiKey: "AIzaSyDemoKeyForLyVHogarSync2026",
-      authDomain: "lyv-hogar.firebaseapp.com",
-      projectId: "lyv-hogar",
-      storageBucket: "lyv-hogar.appspot.com",
-      messagingSenderId: "123456789",
-      appId: "1:123456789:web:demo"
-    };
-
-    if (!firebase.apps.length) {
-      firebase.initializeApp(firebaseConfig);
-    }
-    const db = firebase.firestore();
-
     const DEFAULT_CONFIG = {
       storeName: "L&V HOGAR",
       storeSubtitle: "Artículos para el hogar y cuidado personal",
@@ -67,7 +50,6 @@
       cardStyle: "rounded",
       fontFamily: "sans",
       bgImage: "",
-      aiApiKey: "",
       categories: ["Hogar", "Cuidado Personal", "Electrodomésticos", "Bazar y Cocina", "Aromas y Decoración", "Accesorios"],
       deliveryZones: [
         { name: "Malvinas Argentinas - 1ª Sección", price: 0 },
@@ -79,7 +61,7 @@
 
     const DEFAULT_PRODUCTS = [
       {
-        id: "prod-1",
+        id: 1,
         sku: "LV-ESC-01",
         title: "Escritorio Portátil Multiuso",
         category: "Hogar",
@@ -94,7 +76,7 @@
         variants: "Natural, Roble, Negro"
       },
       {
-        id: "prod-2",
+        id: 2,
         sku: "LV-DIF-02",
         title: "Aroma Difusor Esencial",
         category: "Aromas y Decoración",
@@ -121,7 +103,6 @@
       const [sortBy, setSortBy] = useState('default');
       const [selectedProductModal, setSelectedProductModal] = useState(null);
       
-      // Estado Asistente Virtual IA
       const [isAiChatOpen, setIsAiChatOpen] = useState(false);
       const [aiMessages, setAiMessages] = useState([
         { sender: 'bot', text: '¡Hola! Soy el asistente virtual de L&V HOGAR. ¿En qué te puedo ayudar hoy?' }
@@ -142,28 +123,17 @@
       const [chosenVariant, setChosenVariant] = useState({});
 
       useEffect(() => {
-        const unsubscribeConfig = db.collection('settings').doc('general_config')
-          .onSnapshot((doc) => {
-            if (doc.exists) {
-              const data = doc.data();
-              setConfig(data);
-              localStorage.setItem('lv_config', JSON.stringify(data));
-            }
-          });
-
-        const unsubscribeProducts = db.collection('products')
-          .onSnapshot((snapshot) => {
-            const list = [];
-            snapshot.forEach((doc) => list.push({ id: doc.id, ...doc.data() }));
-            if (list.length > 0) {
-              setProducts(list);
-              localStorage.setItem('lv_products', JSON.stringify(list));
-            }
-          });
-
+        const syncData = () => {
+          const storedConfig = JSON.parse(localStorage.getItem('lv_config'));
+          const storedProducts = JSON.parse(localStorage.getItem('lv_products'));
+          if (storedConfig) setConfig(storedConfig);
+          if (storedProducts) setProducts(storedProducts);
+        };
+        window.addEventListener('storage', syncData);
+        const interval = setInterval(syncData, 1000);
         return () => {
-          unsubscribeConfig();
-          unsubscribeProducts();
+          window.removeEventListener('storage', syncData);
+          clearInterval(interval);
         };
       }, []);
 
@@ -184,11 +154,9 @@
         setAiInput('');
         setIsAiLoading(true);
 
-        try {
-          // Lógica de respuesta inteligente según catálogo local
+        setTimeout(() => {
           const queryLower = userText.toLowerCase();
           let botReply = "";
-
           const matchedProducts = products.filter(p => 
             p.title.toLowerCase().includes(queryLower) || 
             p.description.toLowerCase().includes(queryLower) ||
@@ -196,24 +164,19 @@
           );
 
           if (queryLower.includes('envio') || queryLower.includes('entrega') || queryLower.includes('zona')) {
-            botReply = `Hacemos envíos locales en Malvinas Argentinas (1ª, 2ª y 3ª sección) y en Córdoba Capital. ¡Puedes seleccionar tu zona al momento de confirmar el carrito!`;
+            botReply = `Hacemos envíos locales en Malvinas Argentinas (1ª, 2ª y 3ª sección) y en Córdoba Capital. ¡Puedes seleccionar tu zona al confirmar el carrito!`;
           } else if (queryLower.includes('pago') || queryLower.includes('tarjeta') || queryLower.includes('transferencia')) {
             botReply = `Aceptamos: ${config.paymentMethods || 'Efectivo, Transferencia Bancaria y Mercado Pago'}.`;
           } else if (matchedProducts.length > 0) {
             const prodListStr = matchedProducts.slice(0, 3).map(p => `• ${p.title} - $${p.price.toLocaleString('es-AR')}`).join('\n');
             botReply = `Encontré estas opciones en nuestro catálogo:\n\n${prodListStr}\n\n¿Te gustaría ver alguno en detalle?`;
           } else {
-            botReply = `¡Gracias por consultar! Contamos con una amplia variedad en artículos para el hogar y cuidado personal. Si quieres atención directa, puedes enviarnos un WhatsApp al ${config.whatsappNumber}.`;
+            botReply = `¡Gracias por consultar! Contamos con una amplia variedad en artículos para el hogar y cuidado personal. Si quieres atención directa, escríbenos por WhatsApp al ${config.whatsappNumber}.`;
           }
 
-          setTimeout(() => {
-            setAiMessages(prev => [...prev, { sender: 'bot', text: botReply }]);
-            setIsAiLoading(false);
-          }, 600);
-        } catch (err) {
-          setAiMessages(prev => [...prev, { sender: 'bot', text: 'En este momento estoy aprendiendo. ¡Puedes enviarnos tu consulta directamente por WhatsApp!' }]);
+          setAiMessages(prev => [...prev, { sender: 'bot', text: botReply }]);
           setIsAiLoading(false);
-        }
+        }, 600);
       };
 
       const handleQtyChange = (productId, delta) => {
@@ -534,7 +497,44 @@
             </div>
           </main>
 
-          {/* Botones Flotantes: WhatsApp e IA Chatbot */}
+          {selectedProductModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
+              <div className="bg-white rounded-2xl max-w-lg w-full overflow-hidden shadow-2xl border border-gray-200 max-h-[90vh] overflow-y-auto">
+                {selectedProductModal.video ? (
+                  <div className="relative bg-black">
+                    <video src={selectedProductModal.video} controls autoPlay className="w-full h-64 object-contain"></video>
+                    <button onClick={() => setSelectedProductModal(null)} className="absolute top-3 right-3 bg-black/60 text-white w-8 h-8 rounded-full flex items-center justify-center">
+                      <i className="fa-solid fa-xmark"></i>
+                    </button>
+                  </div>
+                ) : (
+                  <div className="relative h-64 bg-gray-100">
+                    <img src={selectedProductModal.image} alt={selectedProductModal.title} className="w-full h-full object-cover" />
+                    <button onClick={() => setSelectedProductModal(null)} className="absolute top-3 right-3 bg-black/60 text-white w-8 h-8 rounded-full flex items-center justify-center">
+                      <i className="fa-solid fa-xmark"></i>
+                    </button>
+                  </div>
+                )}
+
+                <div className="p-6 space-y-4">
+                  <span style={{ color: primaryColor }} className="text-[10px] font-semibold uppercase tracking-widest">{selectedProductModal.category}</span>
+                  <h3 className="text-xl font-serif font-bold text-gray-800">{selectedProductModal.title}</h3>
+                  <p style={{ color: primaryColor }} className="text-2xl font-serif font-bold">${selectedProductModal.price.toLocaleString('es-AR')}</p>
+                  <p className="text-xs text-gray-600 font-light leading-relaxed">{selectedProductModal.description}</p>
+                  
+                  <div className="border-t pt-4 flex gap-3">
+                    <button onClick={() => { handleSingleProductWhatsApp(selectedProductModal); setSelectedProductModal(null); }} className="flex-1 bg-emerald-700 text-white text-xs font-medium py-3 rounded-xl flex items-center justify-center gap-2">
+                      <i className="fa-brands fa-whatsapp"></i> Consultar WhatsApp
+                    </button>
+                    <button onClick={() => { addToCart(selectedProductModal); setSelectedProductModal(null); }} style={{ backgroundColor: primaryColor }} className="flex-1 text-white text-xs font-medium py-3 rounded-xl flex items-center justify-center gap-2">
+                      <i className="fa-solid fa-bag-shopping"></i> Agregar
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="fixed bottom-6 right-6 flex flex-col gap-3 z-40">
             <button 
               onClick={() => setIsAiChatOpen(!isAiChatOpen)}
@@ -544,13 +544,11 @@
             >
               <i className="fa-solid fa-robot text-2xl"></i>
             </button>
-
             <a href={`https://wa.me/${config.whatsappNumber}`} target="_blank" rel="noopener noreferrer" style={{ backgroundColor: primaryColor }} className="text-white w-14 h-14 rounded-full flex items-center justify-center shadow-2xl transition transform hover:scale-105 border-2 border-white">
               <i className="fa-brands fa-whatsapp text-3xl"></i>
             </a>
           </div>
 
-          {/* Ventana Modal Asistente Virtual IA */}
           {isAiChatOpen && (
             <div className="fixed bottom-24 right-6 w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-gray-200 z-50 overflow-hidden flex flex-col h-96">
               <div style={{ backgroundColor: headerBg }} className="p-3 text-white flex justify-between items-center border-b border-white/10">
@@ -600,7 +598,6 @@
             </div>
           )}
 
-          {/* Carrito de Compras */}
           {isCartOpen && (
             <div className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-xs">
               <div className="bg-white w-full max-w-md h-full flex flex-col justify-between shadow-2xl p-6 overflow-y-auto">
