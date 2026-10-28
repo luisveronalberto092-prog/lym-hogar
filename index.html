@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>L&V HOGAR - Tienda Oficial</title>
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&family=Playfair+Display:wght@500;600;700&display=swap" rel="stylesheet">
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            serif: ['Playfair Display', 'serif'],
+            sans: ['Montserrat', 'sans-serif'],
+          },
+          colors: {
+            brand: {
+              olive: '#768C77',
+              oliveDark: '#5B6F5C',
+              sand: '#C8B297',
+              sandLight: '#F5EFEE',
+              sandBg: '#FAFAF7',
+              darkBg: '#1C1F1D',
+            }
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="bg-brand-sandBg text-gray-800 font-sans antialiased">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    const DEFAULT_CONFIG = {
+      storeName: "L&V HOGAR",
+      storeSubtitle: "Artículos para el hogar y cuidado personal",
+      whatsappNumber: "5493512102238",
+      whatsappMsg: "¡Hola L&V HOGAR! Quisiera realizar la siguiente compra:\n\n",
+      showBanner: true,
+      bannerTitle: "Renueva tu Hogar con Estilo y Calidez",
+      bannerText: "Envíos locales a domicilio y atención personalizada por WhatsApp.",
+      paymentMethods: "Efectivo contra entrega, Transferencia bancaria y Mercado Pago.",
+      brandColor: "#768C77",
+      categories: ["Hogar", "Cuidado Personal", "Electrodomésticos", "Accesorios"],
+      deliveryZones: [
+        { name: "Malvinas Argentinas - 1ª Sección", price: 0 },
+        { name: "Malvinas Argentinas - 2ª Sección", price: 500 },
+        { name: "Malvinas Argentinas - 3ª Sección", price: 800 },
+        { name: "Córdoba Capital (Otras zonas)", price: 1500 }
+      ]
+    };
+
+    function CatalogApp() {
+      const [config, setConfig] = useState(() => JSON.parse(localStorage.getItem('lv_config')) || DEFAULT_CONFIG);
+      const [products, setProducts] = useState(() => JSON.parse(localStorage.getItem('lv_products')) || []);
+      
+      const [cart, setCart] = useState([]);
+      const [isCartOpen, setIsCartOpen] = useState(false);
+      const [searchQuery, setSearchQuery] = useState('');
+      const [selectedCategory, setSelectedCategory] = useState('Todos');
+      const [sortBy, setSortBy] = useState('default');
+      const [selectedProductModal, setSelectedProductModal] = useState(null);
+      const [selectedDeliveryZone, setSelectedDeliveryZone] = useState(0);
+      const [clientAddress, setClientAddress] = useState('');
+      const [addressError, setAddressError] = useState(false);
+      const [copySuccess, setCopySuccess] = useState(false);
+      const [quantities, setQuantities] = useState({});
+      const [chosenVariant, setChosenVariant] = useState({});
+
+      useEffect(() => {
+        const handleStorageChange = () => {
+          const updatedConfig = JSON.parse(localStorage.getItem('lv_config'));
+          const updatedProducts = JSON.parse(localStorage.getItem('lv_products'));
+          if (updatedConfig) setConfig(updatedConfig);
+          if (updatedProducts) setProducts(updatedProducts);
+        };
+        window.addEventListener('storage', handleStorageChange);
+        return () => window.removeEventListener('storage', handleStorageChange);
+      }, []);
+
+      const primaryColor = config.brandColor || '#768C77';
+
+      const handleQtyChange = (productId, delta) => {
+        setQuantities(prev => {
+          const current = prev[productId] || 1;
+          const updated = current + delta;
+          return { ...prev, [productId]: updated > 0 ? updated : 1 };
+        });
+      };
+
+      const handleVariantSelect = (productId, variantVal) => {
+        setChosenVariant(prev => ({ ...prev, [productId]: variantVal }));
+      };
+
+      const addToCart = (product) => {
+        const qtyToAdd = quantities[product.id] || 1;
+        let variantString = "";
+        if (product.variants && product.variants.trim()) {
+          const optionsArray = product.variants.split(',').map(v => v.trim());
+          variantString = chosenVariant[product.id] || optionsArray[0];
+        }
+
+        const cartItemId = variantString ? `${product.id}-${variantString}` : `${product.id}`;
+
+        setCart(prev => {
+          const exists = prev.find(item => item.cartItemId === cartItemId);
+          if (exists) {
+            return prev.map(item => item.cartItemId === cartItemId ? { ...item, qty: item.qty + qtyToAdd } : item);
+          }
+          return [...prev, { 
+            ...product, 
+            cartItemId, 
+            qty: qtyToAdd, 
+            selectedVariant: variantString 
+          }];
+        });
+        setIsCartOpen(true);
+      };
+
+      const updateQty = (cartItemId, delta) => {
+        setCart(prev => prev.map(item => {
+          if (item.cartItemId === cartItemId) {
+            const newQty = item.qty + delta;
+            return newQty > 0 ? { ...item, qty: newQty } : item;
+          }
+          return item;
+        }));
+      };
+
+      const removeFromCart = (cartItemId) => setCart(prev => prev.filter(item => item.cartItemId !== cartItemId));
+
+      const getSubtotal = () => cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+      const getDeliveryCost = () => config.deliveryZones && config.deliveryZones[selectedDeliveryZone] ? config.deliveryZones[selectedDeliveryZone].price : 0;
+      const getTotal = () => getSubtotal() + getDeliveryCost();
+
+      const handleSingleProductWhatsApp = (product) => {
+        const varString = (product.variants && product.variants.trim()) ? ` (Opción: ${chosenVariant[product.id] || product.variants.split(',')[0].trim()})` : '';
+        const message = `¡Hola ${config.storeName}! Me interesa consultar por este producto:\n\n• *${product.title}*${varString} - $${product.price.toLocaleString('es-AR')}\n\n¿Hay stock disponible y cómo podemos coordinar?`;
+        const url = `https://wa.me/${config.whatsappNumber}?text=${encodeURIComponent(message)}`;
+        window.open(url, '_blank');
+      };
+
+      const handleShareProduct = (product) => {
+        const text = `¡Mirá este producto de ${config.storeName}!\n*${product.title}* - $${product.price.toLocaleString('es-AR')}\n${product.description}`;
+        if (navigator.share) {
+          navigator.share({ title: product.title, text: text, url: window.location.href }).catch(() => {});
+        } else {
+          const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
+          window.open(url, '_blank');
+        }
+      };
+
+      const generateOrderText = () => {
+        let message = config.whatsappMsg || "¡Hola! Quisiera realizar la siguiente compra:\n\n";
+        cart.forEach(item => {
+          const varText = item.selectedVariant ? ` [${item.selectedVariant}]` : '';
+          message += `• *${item.title}*${varText} x${item.qty} - $${(item.price * item.qty).toLocaleString('es-AR')}\n`;
+        });
+
+        const zone = config.deliveryZones && config.deliveryZones[selectedDeliveryZone] ? config.deliveryZones[selectedDeliveryZone] : { name: "Estándar", price: 0 };
+        message += `\n*Subtotal:* $${getSubtotal().toLocaleString('es-AR')}`;
+        message += `\n*Zona de Envío:* ${zone.name} ($${zone.price.toLocaleString('es-AR')})`;
+        message += `\n*Dirección de Entrega:* ${clientAddress.trim()}`;
+        message += `\n*TOTAL FINAL:* $${getTotal().toLocaleString('es-AR')}`;
+        message += `\n*Medios de Pago Consultados:* ${config.paymentMethods || 'Efectivo / Transferencia'}\n\n¿Cómo coordinamos el pago y envío?`;
+        return message;
+      };
+
+      const handleCheckoutWhatsApp = () => {
+        if (cart.length === 0) return;
+        if (!clientAddress.trim()) {
+          setAddressError(true);
+          return;
+        }
+        setAddressError(false);
+
+        const message = generateOrderText();
+        const url = `https://wa.me/${config.whatsappNumber}?text=${encodeURIComponent(message)}`;
+        window.open(url, '_blank');
+      };
+
+      const handleCopyOrder = () => {
+        if (!clientAddress.trim()) {
+          setAddressError(true);
+          return;
+        }
+        setAddressError(false);
+        const message = generateOrderText();
+        navigator.clipboard.writeText(message).then(() => {
+          setCopySuccess(true);
+          setTimeout(() => setCopySuccess(false), 3000);
+        });
+      };
+
+      const categories = ['Todos', ...(config.categories || ["Hogar", "Cuidado Personal", "Electrodomésticos", "Accesorios"])];
+      
+      const filteredProducts = products.filter(p => {
+        const matchesCat = selectedCategory === 'Todos' || p.category === selectedCategory;
+        const matchesSearch = p.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                              p.description.toLowerCase().includes(searchQuery.toLowerCase());
+        return matchesCat && matchesSearch;
+      }).sort((a, b) => {
+        if (sortBy === 'low-high') return a.price - b.price;
+        if (sortBy === 'high-low') return b.price - a.price;
+        return 0;
+      });
+
+      return (
+        <div className="min-h-screen flex flex-col relative">
+          <div style={{ backgroundColor: primaryColor }} className="text-white text-[11px] py-1.5 px-4 text-center tracking-wide font-light flex justify-center items-center gap-4 transition-colors">
+            <span><i className="fa-solid fa-truck-fast mr-1"></i> Envíos locales en Malvinas Argentinas y Córdoba</span>
+            <span className="hidden md:inline">|</span>
+            <span className="hidden md:inline"><i className="fa-solid fa-wallet mr-1"></i> Pagos: {config.paymentMethods || 'Efectivo y Transferencia'}</span>
+          </div>
+
+          <header className="bg-brand-darkBg text-white shadow-md sticky top-0 z-40 border-b border-brand-sand/30">
+            <div className="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
+              <div className="flex items-center space-x-3">
+                <div className="w-11 h-11 border border-brand-sand rounded-full flex flex-col items-center justify-center bg-brand-darkBg shadow">
+                  <span style={{ color: primaryColor }} className="font-serif font-bold text-sm tracking-widest leading-none">L&V</span>
+                  <span className="font-serif text-[7px] text-brand-sand tracking-tighter uppercase">HOGAR</span>
+                </div>
+                <div>
+                  <h1 className="text-lg md:text-xl font-serif tracking-widest text-white">{config.storeName}</h1>
+                  <p className="text-[10px] text-brand-sand tracking-wide uppercase hidden sm:block">{config.storeSubtitle}</p>
+                </div>
+              </div>
+
+              <button 
+                onClick={() => setIsCartOpen(true)}
+                style={{ backgroundColor: primaryColor }}
+                className="text-white px-4 py-2 rounded-full flex items-center space-x-2 transition shadow text-xs font-medium border border-brand-sand/40 hover:opacity-90"
+              >
+                <i className="fa-solid fa-bag-shopping text-sm"></i>
+                <span className="hidden sm:inline">Mi Carrito</span>
+                <span className="bg-brand-sand text-brand-darkBg text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center">
+                  {cart.reduce((s, i) => s + i.qty, 0)}
+                </span>
+              </button>
+            </div>
+          </header>
+
+          {config.showBanner && (
+            <section className="bg-gradient-to-r from-brand-darkBg via-[#252A26] to-brand-darkBg text-white py-10 px-4 text-center border-b border-brand-sand/20">
+              <div className="max-w-3xl mx-auto">
+                <span className="bg-brand-sand/20 text-brand-sand text-[10px] font-semibold uppercase tracking-widest px-4 py-1 rounded-full border border-brand-sand/30">
+                  CATÁLOGO OFICIAL
+                </span>
+                <h2 className="text-2xl md:text-3xl font-serif font-normal text-white mt-3 tracking-wide">{config.bannerTitle}</h2>
+                <p className="mt-2 text-gray-300 text-xs md:text-sm tracking-wide font-light">{config.bannerText}</p>
+              </div>
+            </section>
+          )}
+
+          <main className="max-w-7xl mx-auto px-4 py-8 flex-grow w-full">
+            <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4 bg-white p-4 rounded-2xl shadow-sm border border-brand-sand/30">
+              <div className="flex gap-2 overflow-x-auto w-full md:w-auto pb-1 md:pb-0">
+                {categories.map(cat => (
+                  <button
+                    key={cat}
+                    onClick={() => setSelectedCategory(cat)}
+                    style={selectedCategory === cat ? { backgroundColor: primaryColor } : {}}
+                    className={`px-5 py-2 rounded-full text-xs font-medium tracking-wide whitespace-nowrap transition ${
+                      selectedCategory === cat ? 'text-white shadow-sm' : 'bg-brand-sandLight text-gray-600 hover:bg-brand-sand/20'
+                    }`}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+
+              <div className="flex gap-2 w-full md:w-auto">
+                <select 
+                  value={sortBy} 
+                  onChange={(e) => setSortBy(e.target.value)}
+                  className="bg-brand-sandLight border border-brand-sand/40 rounded-full px-3 py-2 text-xs text-gray-700 focus:outline-none focus:ring-1"
+                >
+                  <option value="default">Ordenar por: Destacados</option>
+                  <option value="low-high">Precio: Menor a Mayor</option>
+                  <option value="high-low">Precio: Mayor a Menor</option>
+                </select>
+
+                <div className="relative w-full md:w-60">
+                  <i style={{ color: primaryColor }} className="fa-solid fa-magnifying-glass absolute left-3.5 top-3 text-xs"></i>
+                  <input
+                    type="text"
+                    placeholder="Buscar producto..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full pl-9 pr-4 py-2 bg-brand-sandLight border border-brand-sand/40 rounded-full text-xs focus:outline-none focus:ring-1"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {filteredProducts.length === 0 ? (
+              <div className="bg-white p-12 rounded-2xl shadow-sm text-center text-gray-400 border border-brand-sand/30">
+                <i className="fa-solid fa-store-slash text-4xl mb-3 text-brand-sand"></i>
+                <p className="text-sm">No hay productos disponibles en esta categoría actualmente.</p>
+                <p className="text-xs text-gray-400 mt-1">Carga nuevos artículos desde el panel de administración.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                {filteredProducts.map(product => {
+                  const isAvailable = product.stock > 0;
+                  const currentQty = quantities[product.id] || 1;
+                  const hasVariants = product.variants && product.variants.trim().length > 0;
+                  const variantsList = hasVariants ? product.variants.split(',').map(v => v.trim()) : [];
+                  const activeVariant = chosenVariant[product.id] || (variantsList.length > 0 ? variantsList[0] : '');
+
+                  return (
+                    <div key={product.id} className="bg-white rounded-2xl shadow-sm hover:shadow-md transition overflow-hidden border border-brand-sand/30 flex flex-col justify-between">
+                      <div>
+                        <div className="relative h-52 bg-gray-100 overflow-hidden cursor-pointer group" onClick={() => setSelectedProductModal(product)}>
+                          <img src={product.image} alt={product.title} className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
+                          {product.badge && (
+                            <span className="absolute top-3 left-3 bg-brand-sand text-brand-darkBg text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full shadow">
+                              {product.badge}
+                            </span>
+                          )}
+                          {product.video && (
+                            <span style={{ backgroundColor: primaryColor }} className="absolute bottom-3 left-3 text-white text-[10px] px-2 py-0.5 rounded-md flex items-center gap-1 shadow">
+                              <i className="fa-solid fa-video text-brand-sand"></i> Video
+                            </span>
+                          )}
+                          <span className={`absolute top-3 right-3 text-[10px] font-semibold px-2.5 py-0.5 rounded-full shadow ${
+                            isAvailable ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'
+                          }`}>
+                            {isAvailable ? 'Disponible' : 'Agotado'}
+                          </span>
+                        </div>
+
+                        <div className="p-5">
+                          <div className="flex justify-between items-start">
+                            <span style={{ color: primaryColor }} className="text-[10px] font-semibold uppercase tracking-widest">{product.category}</span>
+                            <button onClick={() => handleShareProduct(product)} className="text-gray-400 hover:text-gray-600 text-xs" title="Compartir producto">
+                              <i className="fa-solid fa-share-nodes"></i>
+                            </button>
+                          </div>
+                          <h3 className="font-serif text-base text-gray-800 mt-1 cursor-pointer hover:opacity-80 transition" onClick={() => setSelectedProductModal(product)}>
+                            {product.title}
+                          </h3>
+                          <p className="text-gray-500 text-xs mt-2 font-light line-clamp-2">{product.description}</p>
+                        </div>
+                      </div>
+
+                      <div className="p-5 pt-0 space-y-3">
+                        <div className="flex justify-between items-center">
+                          <span style={{ color: primaryColor }} className="text-lg font-serif font-bold">${product.price.toLocaleString('es-AR')}</span>
+                          <button 
+                            onClick={() => handleSingleProductWhatsApp(product)} 
+                            style={{ color: primaryColor }}
+                            className="hover:opacity-80 text-xs font-semibold flex items-center gap-1 bg-brand-sandLight px-2.5 py-1.5 rounded-lg transition"
+                          >
+                            <i className="fa-brands fa-whatsapp text-sm"></i>
+                            <span>Consultar</span>
+                          </button>
+                        </div>
+
+                        {hasVariants && (
+                          <div className="space-y-1">
+                            <label className="block text-[11px] font-semibold text-gray-700">
+                              {product.variantsLabel || 'Variante'}:
+                            </label>
+                            <select 
+                              value={activeVariant}
+                              onChange={(e) => handleVariantSelect(product.id, e.target.value)}
+                              className="w-full p-2 bg-brand-sandLight border border-brand-sand/40 rounded-xl text-xs text-gray-700 focus:outline-none"
+                            >
+                              {variantsList.map((v, idx) => (
+                                <option key={idx} value={v}>{v}</option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
+
+                        {isAvailable && (
+                          <div className="flex items-center justify-between bg-brand-sandLight p-1 rounded-xl border border-brand-sand/30">
+                            <div className="flex items-center gap-2 px-2">
+                              <span className="text-[11px] text-gray-500 font-medium">Cant:</span>
+                              <button onClick={() => handleQtyChange(product.id, -1)} className="w-6 h-6 bg-white rounded-md font-bold text-gray-600 shadow-xs hover:bg-gray-100">-</button>
+                              <span className="text-xs font-bold w-4 text-center">{currentQty}</span>
+                              <button onClick={() => handleQtyChange(product.id, 1)} className="w-6 h-6 bg-white rounded-md font-bold text-gray-600 shadow-xs hover:bg-gray-100">+</button>
+                            </div>
+                            <button onClick={() => addToCart(product)} style={{ backgroundColor: primaryColor }} className="text-white px-3 py-1.5 rounded-lg font-medium text-xs transition shadow-xs hover:opacity-90">
+                              Agregar
+                            </button>
+                          </div>
+                        )}
+
+                        {!isAvailable && (
+                          <button disabled className="w-full bg-gray-200 text-gray-400 font-medium text-xs py-2 rounded-xl cursor-not-allowed">
+                            Agotado temporalmente
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </main>
+
+          {selectedProductModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
+              <div className="bg-white rounded-2xl max-w-lg w-full overflow-hidden shadow-2xl border border-brand-sand/30 animate-fadeIn max-h-[90vh] overflow-y-auto">
+                {selectedProductModal.video ? (
+                  <div className="relative bg-black">
+                    <video src={selectedProductModal.video} controls autoPlay className="w-full h-64 object-contain"></video>
+                    <button onClick={() => setSelectedProductModal(null)} className="absolute top-3 right-3 bg-black/60 text-white w-8 h-8 rounded-full flex items-center justify-center hover:bg-black z-10">
+                      <i className="fa-solid fa-xmark"></i>
+                    </button>
+                  </div>
+                ) : (
+                  <div className="relative h-64 bg-gray-100">
+                    <img src={selectedProductModal.image} alt={selectedProductModal.title} className="w-full h-full object-cover" />
+                    <button onClick={() => setSelectedProductModal(null)} className="absolute top-3 right-3 bg-black/60 text-white w-8 h-8 rounded-full flex items-center justify-center hover:bg-black">
+                      <i className="fa-solid fa-xmark"></i>
+                    </button>
+                  </div>
+                )}
+
+                <div className="p-6 space-y-4">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <span style={{ color: primaryColor }} className="text-[10px] font-semibold uppercase tracking-widest">{selectedProductModal.category}</span>
+                      <h3 className="text-xl font-serif font-bold text-gray-800">{selectedProductModal.title}</h3>
+                    </div>
+                    <button onClick={() => handleShareProduct(selectedProductModal)} className="bg-brand-sandLight p-2 rounded-full text-gray-700 hover:bg-brand-sand/30 text-xs flex items-center gap-1">
+                      <i className="fa-solid fa-share-nodes"></i> Compartir
+                    </button>
+                  </div>
+                  <p style={{ color: primaryColor }} className="text-2xl font-serif font-bold">${selectedProductModal.price.toLocaleString('es-AR')}</p>
+                  <p className="text-xs text-gray-600 font-light leading-relaxed">{selectedProductModal.description}</p>
+                  
+                  {selectedProductModal.variants && selectedProductModal.variants.trim() && (
+                    <div className="bg-brand-sandLight p-3 rounded-xl space-y-1">
+                      <label className="block text-xs font-semibold text-gray-700">{selectedProductModal.variantsLabel || 'Variante'}:</label>
+                      <select 
+                        value={chosenVariant[selectedProductModal.id] || selectedProductModal.variants.split(',')[0].trim()}
+                        onChange={(e) => handleVariantSelect(selectedProductModal.id, e.target.value)}
+                        className="w-full p-2 bg-white border border-brand-sand/40 rounded-lg text-xs"
+                      >
+                        {selectedProductModal.variants.split(',').map((v, i) => (
+                          <option key={i} value={v.trim()}>{v.trim()}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  <div className="border-t border-brand-sand/30 pt-4 flex gap-3">
+                    <button 
+                      onClick={() => { handleSingleProductWhatsApp(selectedProductModal); setSelectedProductModal(null); }}
+                      className="flex-1 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-medium py-3 rounded-xl flex items-center justify-center gap-2 shadow"
+                    >
+                      <i className="fa-brands fa-whatsapp text-base"></i>
+                      <span>Consultar Individual</span>
+                    </button>
+                    <button 
+                      onClick={() => { addToCart(selectedProductModal); setSelectedProductModal(null); }}
+                      style={{ backgroundColor: primaryColor }}
+                      className="flex-1 text-white text-xs font-medium py-3 rounded-xl flex items-center justify-center gap-2 shadow hover:opacity-90"
+                    >
+                      <i className="fa-solid fa-bag-shopping"></i>
+                      <span>Agregar al Carrito</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <a
+            href={`https://wa.me/${config.whatsappNumber}?text=${encodeURIComponent("¡Hola! Quisiera realizar una consulta general.")}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ backgroundColor: primaryColor }}
+            className="fixed bottom-6 right-6 text-white w-14 h-14 rounded-full flex items-center justify-center shadow-2xl z-40 transition transform hover:scale-105 border-2 border-brand-sand"
+          >
+            <i className="fa-brands fa-whatsapp text-3xl"></i>
+          </a>
+
+          {isCartOpen && (
+            <div className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-xs">
+              <div className="bg-white w-full max-w-md h-full flex flex-col justify-between shadow-2xl p-6 overflow-y-auto">
+                <div>
+                  <div className="flex justify-between items-center pb-4 border-b border-brand-sand/30">
+                    <h3 className="font-serif text-lg text-gray-800 flex items-center gap-2">
+                      <i style={{ color: primaryColor }} className="fa-solid fa-bag-shopping"></i>
+                      <span>Tu Carrito de Compras</span>
+                    </h3>
+                    <button onClick={() => setIsCartOpen(false)} className="text-gray-400 hover:text-gray-600">
+                      <i className="fa-solid fa-xmark text-lg"></i>
+                    </button>
+                  </div>
+
+                  {cart.length === 0 ? (
+                    <div className="text-center py-12 text-gray-400 font-light">
+                      <i className="fa-solid fa-basket-shopping text-4xl mb-3 text-brand-sand"></i>
+                      <p className="text-xs">Tu carrito está vacío en este momento.</p>
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-gray-100 my-4 max-h-48 overflow-y-auto pr-1">
+                      {cart.map(item => (
+                        <div key={item.cartItemId} className="py-3 flex items-center justify-between text-xs">
+                          <div className="flex items-center gap-3">
+                            <img src={item.image} alt={item.title} className="w-12 h-12 object-cover rounded-xl" />
+                            <div>
+                              <p className="font-serif font-bold text-gray-800">{item.title}</p>
+                              {item.selectedVariant && (
+                                <p className="text-[10px] text-brand-olive font-semibold">Opción: {item.selectedVariant}</p>
+                              )}
+                              <p className="text-gray-500">${item.price.toLocaleString('es-AR')}</p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <button onClick={() => updateQty(item.cartItemId, -1)} className="bg-brand-sandLight hover:bg-brand-sand/30 px-2 py-0.5 rounded font-bold">-</button>
+                            <span className="font-bold">{item.qty}</span>
+                            <button onClick={() => updateQty(item.cartItemId, 1)} className="bg-brand-sandLight hover:bg-brand-sand/30 px-2 py-0.5 rounded font-bold">+</button>
+                            <button onClick={() => removeFromCart(item.cartItemId)} className="text-red-400 hover:text-red-600 ml-2">
+                              <i className="fa-solid fa-trash-can"></i>
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {cart.length > 0 && (
+                  <div className="border-t border-brand-sand/30 pt-4 space-y-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">Zona de Envío:</label>
+                      <select value={selectedDeliveryZone} onChange={(e) => setSelectedDeliveryZone(Number(e.target.value))} className="w-full p-2.5 border border-brand-sand/40 rounded-xl text-xs bg-brand-sandLight">
+                        {config.deliveryZones && config.deliveryZones.map((zone, idx) => (
+                          <option key={idx} value={idx}>{zone.name} - ${zone.price.toLocaleString('es-AR')}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">
+                        <i style={{ color: primaryColor }} className="fa-solid fa-location-dot mr-1"></i>
+                        Dirección de Entrega / Domicilio: <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Ej: Calle 9 de Julio 123, Malvinas Argentinas"
+                        value={clientAddress}
+                        onChange={(e) => {
+                          setClientAddress(e.target.value);
+                          if (e.target.value.trim()) setAddressError(false);
+                        }}
+                        className={`w-full p-2.5 border rounded-xl text-xs bg-brand-sandLight ${addressError ? 'border-red-500 ring-1 ring-red-500' : 'border-brand-sand/40'}`}
+                      />
+                      {addressError && (
+                        <p className="text-[10px] text-red-500 mt-1">Ingresa tu dirección para coordinar la entrega.</p>
+                      )}
+                    </div>
+
+                    <div className="bg-brand-sandLight p-3 rounded-xl text-xs space-y-1.5 border border-brand-sand/20">
+                      <div className="flex justify-between text-gray-600">
+                        <span>Subtotal:</span>
+                        <span>${getSubtotal().toLocaleString('es-AR')}</span>
+                      </div>
+                      <div className="flex justify-between text-gray-600">
+                        <span>Envío:</span>
+                        <span>${getDeliveryCost().toLocaleString('es-AR')}</span>
+                      </div>
+                      <div style={{ color: primaryColor }} className="flex justify-between font-serif font-bold text-sm border-t border-brand-sand/30 pt-1 mt-1">
+                        <span>Total Final:</span>
+                        <span>${getTotal().toLocaleString('es-AR')}</span>
+                      </div>
+                      <div className="text-[11px] text-gray-500 pt-1 border-t border-brand-sand/20">
+                        <span className="font-semibold text-gray-700">Medios de pago:</span> {config.paymentMethods}
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <button onClick={handleCheckoutWhatsApp} style={{ backgroundColor: primaryColor }} className="w-full text-white font-medium py-3 rounded-xl text-xs flex items-center justify-center gap-2 shadow transition hover:opacity-90">
+                        <i className="fa-brands fa-whatsapp text-lg"></i>
+                        <span>Confirmar Pedido por WhatsApp</span>
+                      </button>
+
+                      <button onClick={handleCopyOrder} className="w-full bg-brand-sandLight hover:bg-brand-sand/30 text-gray-700 font-medium py-2.5 rounded-xl text-xs flex items-center justify-center gap-2 transition border border-brand-sand/40">
+                        <i className="fa-solid fa-copy"></i>
+                        <span>{copySuccess ? '¡Pedido copiado al portapapeles!' : 'Copiar Resumen del Pedido'}</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          <footer className="bg-brand-darkBg text-gray-400 py-8 text-center text-xs mt-auto border-t border-brand-sand/20">
+            <div className="flex flex-col items-center justify-center mb-3">
+              <div className="w-8 h-8 border border-brand-sand/50 rounded-full flex flex-col items-center justify-center mb-1">
+                <span className="font-serif text-[10px] text-brand-sand font-bold">L&V</span>
+              </div>
+              <span className="font-serif text-white tracking-widest text-xs">{config.storeName}</span>
+            </div>
+            <p className="font-light">© {new Date().getFullYear()} {config.storeName}. Todos los derechos reservados.</p>
+            <a href="admin.html" className="text-gray-600 hover:text-brand-sand text-[10px] block mt-2 transition">Acceso Administrador</a>
+          </footer>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<CatalogApp />);
+  </script>
+</body>
+</html>
