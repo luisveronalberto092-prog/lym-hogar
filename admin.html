@@ -226,6 +226,15 @@
         }
       };
 
+      const handleVideoUpload = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onloadend = () => setNewProd(prev => ({ ...prev, video: reader.result }));
+          reader.readAsDataURL(file);
+        }
+      };
+
       const handleAddProduct = (e) => {
         e.preventDefault();
         const created = { 
@@ -385,6 +394,14 @@
                       <input type="file" accept="image/*" onChange={handleImageUpload} className="w-full text-xs text-gray-500 file:mr-4 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-gray-700 file:text-white cursor-pointer" />
                       <input type="text" placeholder="O URL de imagen..." value={newProd.image.startsWith('data:') ? '' : newProd.image} onChange={e=>setNewProd({...newProd, image: e.target.value})} className="w-full p-1.5 border rounded-lg bg-white text-[11px] mt-1" />
                     </div>
+
+                    <div className="bg-gray-50 p-3 rounded-xl border space-y-1">
+                      <label className="block font-semibold">
+                        <i style={{ color: primaryColor }} className="fa-solid fa-video mr-1"></i> Video Demostrativo (Opcional):
+                      </label>
+                      <input type="file" accept="video/*" onChange={handleVideoUpload} className="w-full text-xs text-gray-500 file:mr-4 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-gray-700 file:text-white cursor-pointer" />
+                      <input type="text" placeholder="O pega URL de video..." value={newProd.video.startsWith('data:') ? '' : newProd.video} onChange={e=>setNewProd({...newProd, video: e.target.value})} className="w-full p-1.5 border rounded-lg bg-white text-[11px] mt-1" />
+                    </div>
                     
                     <div>
                       <div className="flex justify-between items-center mb-1">
@@ -523,7 +540,7 @@
                   <p className="text-gray-600">Modifica tu contraseña de acceso al panel de administración:</p>
                   {passChangeMsg && <p className={`p-2 rounded text-center ${passChangeMsg.includes('correctamente') ? 'bg-emerald-50 text-emerald-800' : 'bg-red-50 text-red-600'}`}>{passChangeMsg}</p>}
                   <div><label className="block font-semibold mb-1">Contraseña Actual:</label><input type="password" value={currentPassChange} onChange={e=>setCurrentPassChange(e.target.value)} className="w-full p-2.5 border rounded-xl bg-gray-50" required /></div>
-                  <div><label className="block font-semibold mb-1">Nueva Contraseña:</label><input type="password" value={newPassChange} onChange={e=>setNewPassChange(e.target.value)} className="w-full p-2.5 border rounded-xl bg-gray-50" required /></div>
+                  <div><label className="block font-semibold mb-1">Nueva Contraseña:</label><input type="password" value={newPassChange} onChange={e=>newPassChange(e.target.value)} onChange={e=>setNewPassChange(e.target.value)} className="w-full p-2.5 border rounded-xl bg-gray-50" required /></div>
                   <button type="submit" style={{ backgroundColor: primaryColor }} className="w-full text-white py-2.5 rounded-xl font-medium shadow">Actualizar Contraseña</button>
                 </form>
 
