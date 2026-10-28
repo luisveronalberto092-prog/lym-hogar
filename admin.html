@@ -9,6 +9,7 @@
   <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -33,6 +34,10 @@
 
   <script type="text/babel">
     const { useState, useEffect } = React;
+
+    const SUPABASE_URL = "https://cleduaakmebcnldqeaoo.supabase.co";
+    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNsZWR1YWFrbWViY25sZHFlYW9vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMyMjYxMzgsImV4cCI6MjEwODgwMjEzOH0.Wl1DsflvOJLNDCaCjdNyaGe91KpCH7zpqZGJVDOpH2s";
+    const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
     const DEFAULT_CONFIG = {
       storeName: "L&V HOGAR",
@@ -61,39 +66,6 @@
       ]
     };
 
-    const DEFAULT_PRODUCTS = [
-      {
-        id: 1,
-        sku: "LV-ESC-01",
-        title: "Escritorio Portátil Multiuso",
-        category: "Hogar",
-        price: 18500,
-        originalPrice: 22000,
-        stock: 12,
-        image: "https://images.unsplash.com/photo-1518455027359-f3f8164ba6bd?auto=format&fit=crop&w=600&q=80",
-        video: "",
-        description: "Escritorio plegable e ideal para trabajar o estudiar cómodamente desde el sofá o la cama.",
-        badge: "OFERTA",
-        variantsLabel: "Color",
-        variants: "Natural, Roble, Negro"
-      },
-      {
-        id: 2,
-        sku: "LV-DIF-02",
-        title: "Aroma Difusor Esencial",
-        category: "Aromas y Decoración",
-        price: 12900,
-        originalPrice: 15000,
-        stock: 8,
-        image: "https://images.unsplash.com/photo-1608571423902-eed4a5ad8108?auto=format&fit=crop&w=600&q=80",
-        video: "",
-        description: "Difusor ultrasónico con luces LED ambientales para aceites esenciales.",
-        badge: "NUEVO",
-        variantsLabel: "Capacidad (ml)",
-        variants: "200ml, 400ml, 500ml"
-      }
-    ];
-
     function AdminApp() {
       const [isAuthenticated, setIsAuthenticated] = useState(false);
       const [user, setUser] = useState('');
@@ -101,46 +73,39 @@
       const [error, setError] = useState('');
       const [tab, setTab] = useState('products');
 
-      const [isRecovering, setIsRecovering] = useState(false);
-      const [recoveryStep, setRecoveryStep] = useState(1);
-      const [recoverySecretInput, setRecoverySecretInput] = useState('');
-      const [newPasswordInput, setNewPasswordInput] = useState('');
-      const [recoveryMsg, setRecoveryMsg] = useState('');
-
       const [config, setConfig] = useState(() => JSON.parse(localStorage.getItem('lv_config')) || DEFAULT_CONFIG);
-      const [products, setProducts] = useState(() => JSON.parse(localStorage.getItem('lv_products')) || DEFAULT_PRODUCTS);
+      const [products, setProducts] = useState([]);
+      const [loadingList, setLoadingList] = useState(true);
       
       const [newProd, setNewProd] = useState({ 
-        sku: '', title: '', price: '', originalPrice: '', stock: '', category: 'Hogar', image: '', video: '', description: '', badge: '', variantsLabel: 'Color', variants: '' 
+        sku: '', title: '', price: '', stock: '10', category: 'Hogar', image: '', description: '', variants: '' 
       });
-      const [newCategoryInput, setNewCategoryInput] = useState('');
       const [savedMessage, setSavedMessage] = useState('');
       const [isGeneratingAi, setIsGeneratingAi] = useState(false);
 
-      const [currentPassChange, setCurrentPassChange] = useState('');
-      const [newPassChange, setNewPassChange] = useState('');
-      const [passChangeMsg, setPassChangeMsg] = useState('');
+      const fetchProductsFromSupabase = async () => {
+        try {
+          const { data, error } = await supabaseClient
+            .from('productos')
+            .select('*')
+            .order('id', { ascending: false });
+
+          if (error) throw error;
+          setProducts(data || []);
+        } catch (err) {
+          console.error("Error al cargar productos:", err);
+        } finally {
+          setLoadingList(false);
+        }
+      };
 
       useEffect(() => {
-        localStorage.setItem('lv_config', JSON.stringify(config));
-      }, [config]);
-
-      useEffect(() => {
-        localStorage.setItem('lv_products', JSON.stringify(products));
-      }, [products]);
+        if (isAuthenticated) {
+          fetchProductsFromSupabase();
+        }
+      }, [isAuthenticated]);
 
       const primaryColor = config.brandColor || '#768C77';
-
-      const handleExportProductsJson = () => {
-        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(products, null, 2));
-        const downloadAnchor = document.createElement('a');
-        downloadAnchor.setAttribute("href", dataStr);
-        downloadAnchor.setAttribute("download", "productos.json");
-        document.body.appendChild(downloadAnchor);
-        downloadAnchor.click();
-        downloadAnchor.remove();
-        alert('¡Archivo de respaldo generado! Puedes subir este "productos.json" a tu repositorio de GitHub si deseas sincronizar en otros dispositivos.');
-      };
 
       const handleGenerateAiDescription = () => {
         if (!newProd.title.trim()) {
@@ -153,14 +118,7 @@
           const autoDesc = `${newProd.title} ideal para transformar tus espacios. Fabricado con materiales resistentes y de excelente terminación. Producto práctico, cómodo y perfecto para el uso diario en tu hogar u oficina. ¡Disponible para entrega en Malvinas Argentinas y Córdoba Capital!`;
           setNewProd(prev => ({ ...prev, description: autoDesc }));
           setIsGeneratingAi(false);
-        }, 1000);
-      };
-
-      const handleGenerateWhatsAppPromo = (prod) => {
-        const text = `🔥 *OFERTA IMPERDIBLE EN L&V HOGAR* 🔥\n\n✨ *${prod.title}*\n💰 Precio especial: *$${prod.price.toLocaleString('es-AR')}*\n\n📦 Envíos en Malvinas Argentinas y Córdoba Capital.\n\n📲 Pedilo directo haciendo clic acá:\nhttps://luisveronalberto092-prog.github.io/LyV-Hogar-admi/`;
-        navigator.clipboard.writeText(text).then(() => {
-          alert('¡Texto promocional para WhatsApp copiado al portapapeles!');
-        });
+        }, 800);
       };
 
       const handleLogin = (e) => {
@@ -173,107 +131,40 @@
         }
       };
 
-      const handleRecoverWhatsApp = () => {
-        const text = `¡Hola! Necesito recuperar la contraseña de administrador de L&V HOGAR. Mi clave secreta es: ${config.secretRecoveryKey || 'cordoba2026'}`;
-        window.open(`https://wa.me/${config.whatsappNumber}?text=${encodeURIComponent(text)}`, '_blank');
-      };
-
-      const handleRecoverSecretSubmit = (e) => {
+      const handleAddProduct = async (e) => {
         e.preventDefault();
-        if (recoverySecretInput.trim() === (config.secretRecoveryKey || 'cordoba2026')) {
-          setRecoveryStep(2);
-          setRecoveryMsg('');
-        } else {
-          setRecoveryMsg('Clave secreta incorrecta.');
+        try {
+          const payload = {
+            title: newProd.title.trim(),
+            price: parseFloat(newProd.price),
+            category: newProd.category,
+            stock: parseInt(newProd.stock),
+            image: newProd.image.trim() || 'https://images.unsplash.com/photo-1583847268964-b28dc8f51f92?auto=format&fit=crop&w=600&q=80',
+            description: newProd.description.trim(),
+            variants: newProd.variants.trim()
+          };
+
+          const { error } = await supabaseClient.from('productos').insert([payload]);
+          if (error) throw error;
+
+          setNewProd({ sku: '', title: '', price: '', stock: '10', category: config.categories?.[0] || 'Hogar', image: '', description: '', variants: '' });
+          setSavedMessage('¡Producto guardado en Supabase con éxito!');
+          fetchProductsFromSupabase();
+          setTimeout(() => setSavedMessage(''), 3000);
+        } catch (err) {
+          alert('Error al guardar el producto en la base de datos: ' + err.message);
         }
       };
 
-      const handleSaveNewPassword = (e) => {
-        e.preventDefault();
-        if (newPasswordInput.trim().length < 4) {
-          setRecoveryMsg('La contraseña debe tener al menos 4 caracteres.');
-          return;
+      const handleDeleteProduct = async (id) => {
+        if (!confirm('¿Seguro que querés eliminar este producto?')) return;
+        try {
+          const { error } = await supabaseClient.from('productos').delete().eq('id', id);
+          if (error) throw error;
+          fetchProductsFromSupabase();
+        } catch (err) {
+          alert('Error al eliminar: ' + err.message);
         }
-        setConfig({ ...config, adminPassword: newPasswordInput.trim() });
-        setIsRecovering(false);
-        setRecoveryStep(1);
-        setNewPasswordInput('');
-        setRecoverySecretInput('');
-        alert('¡Contraseña actualizada con éxito! Ya puedes iniciar sesión.');
-      };
-
-      const handleChangePasswordInPanel = (e) => {
-        e.preventDefault();
-        const validPass = config.adminPassword || 'admin123';
-        if (currentPassChange !== validPass) {
-          setPassChangeMsg('La contraseña actual es incorrecta.');
-          return;
-        }
-        if (newPassChange.trim().length < 4) {
-          setPassChangeMsg('La nueva contraseña es muy corta.');
-          return;
-        }
-        setConfig({ ...config, adminPassword: newPassChange.trim() });
-        setCurrentPassChange('');
-        setNewPassChange('');
-        setPassChangeMsg('¡Contraseña modificada correctamente!');
-        setTimeout(() => setPassChangeMsg(''), 4000);
-      };
-
-      const handleImageUpload = (e) => {
-        const file = e.target.files[0];
-        if (file) {
-          const reader = new FileReader();
-          reader.onloadend = () => setNewProd(prev => ({ ...prev, image: reader.result }));
-          reader.readAsDataURL(file);
-        }
-      };
-
-      const handleVideoUpload = (e) => {
-        const file = e.target.files[0];
-        if (file) {
-          const reader = new FileReader();
-          reader.onloadend = () => setNewProd(prev => ({ ...prev, video: reader.result }));
-          reader.readAsDataURL(file);
-        }
-      };
-
-      const handleAddProduct = (e) => {
-        e.preventDefault();
-        const created = { 
-          ...newProd, 
-          id: Date.now(),
-          price: parseFloat(newProd.price), 
-          originalPrice: newProd.originalPrice ? parseFloat(newProd.originalPrice) : null,
-          stock: parseInt(newProd.stock),
-          image: newProd.image || 'https://images.unsplash.com/photo-1583847268964-b28dc8f51f92?auto=format&fit=crop&w=600&q=80'
-        };
-        
-        setProducts([created, ...products]);
-        setNewProd({ sku: '', title: '', price: '', originalPrice: '', stock: '', category: config.categories?.[0] || 'Hogar', image: '', video: '', description: '', badge: '', variantsLabel: 'Color', variants: '' });
-      };
-
-      const handleDelete = (id) => setProducts(products.filter(p => p.id !== id));
-      const handleToggleStock = (id) => setProducts(products.map(p => p.id === id ? { ...p, stock: p.stock > 0 ? 0 : 10 } : p));
-
-      const handleAddCategory = () => {
-        if (!newCategoryInput.trim()) return;
-        const currentCats = config.categories || [];
-        if (!currentCats.includes(newCategoryInput.trim())) {
-          setConfig({ ...config, categories: [...currentCats, newCategoryInput.trim()] });
-          setNewCategoryInput('');
-        }
-      };
-
-      const handleRemoveCategory = (cat) => {
-        setConfig({ ...config, categories: config.categories.filter(c => c !== cat) });
-      };
-
-      const handleSaveConfig = (e) => {
-        e.preventDefault();
-        localStorage.setItem('lv_config', JSON.stringify(config));
-        setSavedMessage('¡Diseño y configuración guardados exitosamente!');
-        setTimeout(() => setSavedMessage(''), 4000);
       };
 
       if (!isAuthenticated) {
@@ -288,45 +179,18 @@
                 <p className="text-xs text-gray-500">L&V HOGAR Administración</p>
               </div>
 
-              {!isRecovering ? (
-                <form onSubmit={handleLogin} className="space-y-3">
-                  {error && <p className="text-xs text-red-500 text-center bg-red-50 p-2 rounded">{error}</p>}
-                  <div>
-                    <label className="block text-xs font-semibold mb-1">Usuario</label>
-                    <input type="text" value={user} onChange={e=>setUser(e.target.value)} className="w-full p-2.5 border rounded-xl text-xs bg-gray-50" required />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold mb-1">Contraseña</label>
-                    <input type="password" value={pass} onChange={e=>setPass(e.target.value)} className="w-full p-2.5 border rounded-xl text-xs bg-gray-50" required />
-                  </div>
-                  <button type="submit" style={{ backgroundColor: primaryColor }} className="w-full text-white py-2.5 rounded-xl text-xs font-medium shadow">Ingresar</button>
-                  <div className="text-center pt-2">
-                    <button type="button" onClick={() => setIsRecovering(true)} className="text-[11px] text-gray-500 hover:underline">¿Olvidaste tu contraseña?</button>
-                  </div>
-                </form>
-              ) : (
-                <div className="space-y-3">
-                  <h3 className="font-serif font-bold text-sm text-center">Recuperar Contraseña</h3>
-                  {recoveryMsg && <p className="text-xs text-red-500 bg-red-50 p-2 rounded text-center">{recoveryMsg}</p>}
-
-                  {recoveryStep === 1 ? (
-                    <form onSubmit={handleRecoverSecretSubmit} className="space-y-3">
-                      <p className="text-[11px] text-gray-600">Ingresa tu Clave Secreta de Recuperación o solicítala por WhatsApp:</p>
-                      <input type="password" placeholder="Clave secreta" value={recoverySecretInput} onChange={e=>setRecoverySecretInput(e.target.value)} className="w-full p-2.5 border rounded-xl text-xs bg-gray-50" required />
-                      <button type="submit" style={{ backgroundColor: primaryColor }} className="w-full text-white py-2 rounded-xl text-xs">Verificar Clave Secreta</button>
-                      <button type="button" onClick={handleRecoverWhatsApp} className="w-full bg-emerald-600 text-white py-2 rounded-xl text-xs flex items-center justify-center gap-1"><i className="fa-brands fa-whatsapp"></i> Solicitar por WhatsApp</button>
-                    </form>
-                  ) : (
-                    <form onSubmit={handleSaveNewPassword} className="space-y-3">
-                      <p className="text-[11px] text-emerald-700 font-semibold">¡Clave verificada! Ingresa tu nueva contraseña:</p>
-                      <input type="password" placeholder="Nueva contraseña" value={newPasswordInput} onChange={e=>setNewPasswordInput(e.target.value)} className="w-full p-2.5 border rounded-xl text-xs bg-gray-50" required />
-                      <button type="submit" style={{ backgroundColor: primaryColor }} className="w-full text-white py-2 rounded-xl text-xs">Guardar Nueva Contraseña</button>
-                    </form>
-                  )}
-
-                  <button type="button" onClick={() => { setIsRecovering(false); setRecoveryStep(1); }} className="w-full text-xs text-gray-500 hover:underline mt-2">Volver al inicio de sesión</button>
+              <form onSubmit={handleLogin} className="space-y-3">
+                {error && <p className="text-xs text-red-500 text-center bg-red-50 p-2 rounded">{error}</p>}
+                <div>
+                  <label className="block text-xs font-semibold mb-1">Usuario</label>
+                  <input type="text" value={user} onChange={e=>setUser(e.target.value)} className="w-full p-2.5 border rounded-xl text-xs bg-gray-50" required />
                 </div>
-              )}
+                <div>
+                  <label className="block text-xs font-semibold mb-1">Contraseña</label>
+                  <input type="password" value={pass} onChange={e=>setPass(e.target.value)} className="w-full p-2.5 border rounded-xl text-xs bg-gray-50" required />
+                </div>
+                <button type="submit" style={{ backgroundColor: primaryColor }} className="w-full text-white py-2.5 rounded-xl text-xs font-medium shadow">Ingresar</button>
+              </form>
 
               <a href="index.html" className="block text-center text-xs text-gray-400 hover:underline pt-2">Volver a la tienda</a>
             </div>
@@ -339,30 +203,13 @@
           <header className="bg-[#1C1F1D] text-white p-4 flex justify-between items-center text-xs border-b border-white/10">
             <div className="flex items-center space-x-2">
               <span className="font-serif font-bold text-[#C8B297] text-sm">L&V HOGAR</span>
-              <span className="text-gray-400">| Panel de Administración</span>
+              <span className="text-gray-400">| Sincronización Automática Supabase</span>
             </div>
             <div className="flex gap-4">
-              <button onClick={handleExportProductsJson} className="text-amber-400 hover:underline flex items-center gap-1">
-                <i className="fa-solid fa-cloud-arrow-up"></i> Exportar Respaldo
-              </button>
               <a href="index.html" target="_blank" className="text-[#C8B297] hover:underline flex items-center gap-1">Ver Tienda <i className="fa-solid fa-external-link text-[10px]"></i></a>
               <button onClick={() => setIsAuthenticated(false)} className="text-red-400 hover:underline">Cerrar Sesión</button>
             </div>
           </header>
-
-          <div className="bg-white border-b">
-            <div className="max-w-6xl mx-auto px-4 flex space-x-4 text-xs font-medium">
-              <button onClick={() => setTab('products')} style={tab === 'products' ? { borderColor: primaryColor, color: primaryColor } : {}} className={`py-3.5 px-3 border-b-2 flex items-center gap-2 ${tab === 'products' ? 'font-bold' : 'border-transparent text-gray-600'}`}>
-                <i className="fa-solid fa-boxes-stacked"></i> Productos ({products.length})
-              </button>
-              <button onClick={() => setTab('design')} style={tab === 'design' ? { borderColor: primaryColor, color: primaryColor } : {}} className={`py-3.5 px-3 border-b-2 flex items-center gap-2 ${tab === 'design' ? 'font-bold' : 'border-transparent text-gray-600'}`}>
-                <i className="fa-solid fa-palette"></i> Diseño Gráfico y Tienda
-              </button>
-              <button onClick={() => setTab('security')} style={tab === 'security' ? { borderColor: primaryColor, color: primaryColor } : {}} className={`py-3.5 px-3 border-b-2 flex items-center gap-2 ${tab === 'security' ? 'font-bold' : 'border-transparent text-gray-600'}`}>
-                <i className="fa-solid fa-shield-halved"></i> Seguridad
-              </button>
-            </div>
-          </div>
 
           <main className="max-w-6xl mx-auto p-6 w-full flex-grow">
             {savedMessage && (
@@ -371,198 +218,97 @@
               </div>
             )}
 
-            {tab === 'products' && (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="bg-white p-5 rounded-2xl shadow-sm border space-y-3 text-xs">
-                  <h3 className="font-serif font-bold text-sm">Agregar Producto</h3>
-                  <form onSubmit={handleAddProduct} className="space-y-3">
-                    <div className="grid grid-cols-3 gap-2">
-                      <div className="col-span-2"><label className="block font-medium mb-1">Título</label><input type="text" value={newProd.title} onChange={e=>setNewProd({...newProd, title: e.target.value})} className="w-full p-2 border rounded-xl bg-gray-50" required /></div>
-                      <div><label className="block font-medium mb-1">SKU</label><input type="text" value={newProd.sku} onChange={e=>setNewProd({...newProd, sku: e.target.value})} className="w-full p-2 border rounded-xl font-mono text-[11px] bg-gray-50" /></div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div><label className="block font-medium mb-1">Categoría</label><select value={newProd.category} onChange={e=>setNewProd({...newProd, category: e.target.value})} className="w-full p-2 border rounded-xl bg-gray-50">{(config.categories || []).map(c=>(<option key={c} value={c}>{c}</option>))}</select></div>
-                      <div><label className="block font-medium mb-1">Etiqueta</label><input type="text" placeholder="OFERTA" value={newProd.badge} onChange={e=>setNewProd({...newProd, badge: e.target.value})} className="w-full p-2 border rounded-xl bg-gray-50" /></div>
-                    </div>
-                    <div className="grid grid-cols-3 gap-2">
-                      <div><label className="block font-medium mb-1">Precio ($)</label><input type="number" value={newProd.price} onChange={e=>setNewProd({...newProd, price: e.target.value})} className="w-full p-2 border rounded-xl font-bold bg-gray-50" required /></div>
-                      <div><label className="block font-medium mb-1">Tachado</label><input type="number" value={newProd.originalPrice} onChange={e=>setNewProd({...newProd, originalPrice: e.target.value})} className="w-full p-2 border rounded-xl bg-gray-50" /></div>
-                      <div><label className="block font-medium mb-1">Stock</label><input type="number" value={newProd.stock} onChange={e=>setNewProd({...newProd, stock: e.target.value})} className="w-full p-2 border rounded-xl bg-gray-50" required /></div>
-                    </div>
-                    <div className="bg-gray-50 p-3 rounded-xl border space-y-2">
-                      <label className="block font-semibold">Variantes (Color/Talle):</label>
-                      <div className="grid grid-cols-2 gap-2">
-                        <input type="text" placeholder="Tipo (Color)" value={newProd.variantsLabel} onChange={e=>setNewProd({...newProd, variantsLabel: e.target.value})} className="w-full p-1.5 border rounded-lg bg-white text-[11px]" />
-                        <input type="text" placeholder="Rojo, Azul" value={newProd.variants} onChange={e=>setNewProd({...newProd, variants: e.target.value})} className="w-full p-1.5 border rounded-lg bg-white text-[11px]" />
-                      </div>
-                    </div>
-                    <div className="bg-gray-50 p-3 rounded-xl border space-y-1">
-                      <label className="block font-semibold">Foto Principal:</label>
-                      <input type="file" accept="image/*" onChange={handleImageUpload} className="w-full text-xs text-gray-500 file:mr-4 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-gray-700 file:text-white cursor-pointer" />
-                      <input type="text" placeholder="O URL de imagen..." value={newProd.image.startsWith('data:') ? '' : newProd.image} onChange={e=>setNewProd({...newProd, image: e.target.value})} className="w-full p-1.5 border rounded-lg bg-white text-[11px] mt-1" />
-                    </div>
-
-                    <div className="bg-gray-50 p-3 rounded-xl border space-y-1">
-                      <label className="block font-semibold">
-                        <i style={{ color: primaryColor }} className="fa-solid fa-video mr-1"></i> Video Demostrativo (Opcional):
-                      </label>
-                      <input type="file" accept="video/*" onChange={handleVideoUpload} className="w-full text-xs text-gray-500 file:mr-4 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-gray-700 file:text-white cursor-pointer" />
-                      <input type="text" placeholder="O pega URL de video..." value={newProd.video.startsWith('data:') ? '' : newProd.video} onChange={e=>setNewProd({...newProd, video: e.target.value})} className="w-full p-1.5 border rounded-lg bg-white text-[11px] mt-1" />
-                    </div>
-                    
-                    <div>
-                      <div className="flex justify-between items-center mb-1">
-                        <label className="font-medium">Descripción</label>
-                        <button 
-                          type="button" 
-                          onClick={handleGenerateAiDescription} 
-                          disabled={isGeneratingAi}
-                          className="text-[10px] text-amber-700 bg-amber-100 hover:bg-amber-200 px-2 py-0.5 rounded-md font-semibold flex items-center gap-1"
-                        >
-                          <i className="fa-solid fa-wand-magic-sparkles"></i> {isGeneratingAi ? 'Redactando...' : 'Redactar con IA'}
-                        </button>
-                      </div>
-                      <textarea value={newProd.description} onChange={e=>setNewProd({...newProd, description: e.target.value})} className="w-full p-2 border rounded-xl h-20 bg-gray-50"></textarea>
-                    </div>
-
-                    <button type="submit" style={{ backgroundColor: primaryColor }} className="w-full text-white font-medium py-2.5 rounded-xl shadow">Guardar Producto</button>
-                  </form>
-                </div>
-
-                <div className="bg-white p-5 rounded-2xl shadow-sm border space-y-3 text-xs md:col-span-2">
-                  <div className="flex justify-between items-center">
-                    <h3 className="font-serif font-bold text-sm">Inventario ({products.length})</h3>
-                    <button onClick={handleExportProductsJson} className="bg-amber-100 text-amber-800 px-3 py-1.5 rounded-xl font-semibold flex items-center gap-1 hover:bg-amber-200">
-                      <i className="fa-solid fa-cloud-arrow-up"></i> Exportar Respaldo JSON
-                    </button>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="bg-white p-5 rounded-2xl shadow-sm border space-y-3 text-xs">
+                <h3 className="font-serif font-bold text-sm">Cargar Producto (Nube Directa)</h3>
+                <form onSubmit={handleAddProduct} className="space-y-3">
+                  <div>
+                    <label className="block font-medium mb-1">Título del Producto</label>
+                    <input type="text" value={newProd.title} onChange={e=>setNewProd({...newProd, title: e.target.value})} className="w-full p-2 border rounded-xl bg-gray-50" required />
                   </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block font-medium mb-1">Categoría</label>
+                      <select value={newProd.category} onChange={e=>setNewProd({...newProd, category: e.target.value})} className="w-full p-2 border rounded-xl bg-gray-50">
+                        {(config.categories || []).map(c=>(<option key={c} value={c}>{c}</option>))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block font-medium mb-1">Precio ($)</label>
+                      <input type="number" value={newProd.price} onChange={e=>setNewProd({...newProd, price: e.target.value})} className="w-full p-2 border rounded-xl font-bold bg-gray-50" required />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block font-medium mb-1">Stock</label>
+                      <input type="number" value={newProd.stock} onChange={e=>setNewProd({...newProd, stock: e.target.value})} className="w-full p-2 border rounded-xl bg-gray-50" required />
+                    </div>
+                    <div>
+                      <label className="block font-medium mb-1">Variantes (opcional)</label>
+                      <input type="text" placeholder="Rojo, Azul, Talle S" value={newProd.variants} onChange={e=>setNewProd({...newProd, variants: e.target.value})} className="w-full p-2 border rounded-xl bg-gray-50" />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block font-medium mb-1">URL Foto Principal</label>
+                    <input type="text" placeholder="https://..." value={newProd.image} onChange={e=>setNewProd({...newProd, image: e.target.value})} className="w-full p-2 border rounded-xl bg-gray-50" />
+                  </div>
+                  <div>
+                    <div className="flex justify-between items-center mb-1">
+                      <label className="font-medium">Descripción</label>
+                      <button 
+                        type="button" 
+                        onClick={handleGenerateAiDescription} 
+                        disabled={isGeneratingAi}
+                        className="text-[10px] text-amber-700 bg-amber-100 hover:bg-amber-200 px-2 py-0.5 rounded-md font-semibold flex items-center gap-1"
+                      >
+                        <i className="fa-solid fa-wand-magic-sparkles"></i> {isGeneratingAi ? 'Redactando...' : 'Redactar con IA'}
+                      </button>
+                    </div>
+                    <textarea value={newProd.description} onChange={e=>setNewProd({...newProd, description: e.target.value})} className="w-full p-2 border rounded-xl h-20 bg-gray-50"></textarea>
+                  </div>
+
+                  <button type="submit" style={{ backgroundColor: primaryColor }} className="w-full text-white font-medium py-2.5 rounded-xl shadow">
+                    Guardar Producto en Supabase
+                  </button>
+                </form>
+              </div>
+
+              <div className="bg-white p-5 rounded-2xl shadow-sm border space-y-3 text-xs md:col-span-2">
+                <h3 className="font-serif font-bold text-sm">Inventario en Tiempo Real ({products.length})</h3>
+                {loadingList ? (
+                  <div className="text-center py-10 text-gray-400">Cargando inventario de Supabase...</div>
+                ) : (
                   <div className="overflow-x-auto">
                     <table className="w-full text-left border-collapse">
                       <thead>
                         <tr className="border-b bg-gray-50 text-gray-600">
-                          <th className="p-2.5">Foto</th><th className="p-2.5">SKU</th><th className="p-2.5">Producto</th><th className="p-2.5">Precio</th><th className="p-2.5">Estado</th><th className="p-2.5 text-right">Acciones</th>
+                          <th className="p-2.5">Foto</th>
+                          <th className="p-2.5">Producto</th>
+                          <th className="p-2.5">Categoría</th>
+                          <th className="p-2.5">Precio</th>
+                          <th className="p-2.5">Stock</th>
+                          <th className="p-2.5 text-right">Acción</th>
                         </tr>
                       </thead>
                       <tbody>
                         {products.map(p => (
                           <tr key={p.id} className="border-b hover:bg-gray-50">
-                            <td className="p-2.5"><img src={p.image} className="w-10 h-10 object-cover rounded-lg border" /></td>
-                            <td className="p-2.5 font-mono text-[11px]">{p.sku || '-'}</td>
+                            <td className="p-2.5"><img src={p.image || 'https://images.unsplash.com/photo-1583847268964-b28dc8f51f92?auto=format&fit=crop&w=600&q=80'} className="w-10 h-10 object-cover rounded-lg border" /></td>
                             <td className="p-2.5 font-semibold">{p.title}</td>
-                            <td style={{ color: primaryColor }} className="p-2.5 font-serif font-bold">${p.price.toLocaleString('es-AR')}</td>
-                            <td className="p-2.5"><button onClick={()=>handleToggleStock(p.id)} className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${p.stock > 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}`}>{p.stock > 0 ? 'Disponible' : 'Agotado'}</button></td>
-                            <td className="p-2.5 text-right flex justify-end gap-2 mt-2">
-                              <button onClick={() => handleGenerateWhatsAppPromo(p)} className="text-amber-600 hover:text-amber-800" title="Copiar Promo IA para WhatsApp">
-                                <i className="fa-solid fa-share-nodes"></i>
-                              </button>
-                              <button onClick={()=>handleDelete(p.id)} className="text-red-400 hover:text-red-600"><i className="fa-solid fa-trash"></i></button>
+                            <td className="p-2.5 text-gray-500">{p.category}</td>
+                            <td style={{ color: primaryColor }} className="p-2.5 font-serif font-bold">${Number(p.price).toLocaleString('es-AR')}</td>
+                            <td className="p-2.5"><span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${Number(p.stock) > 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}`}>{p.stock} un.</span></td>
+                            <td className="p-2.5 text-right">
+                              <button onClick={() => handleDeleteProduct(p.id)} className="text-red-400 hover:text-red-600"><i className="fa-solid fa-trash"></i></button>
                             </td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
                   </div>
-                </div>
+                )}
               </div>
-            )}
-
-            {tab === 'design' && (
-              <div className="bg-white p-6 rounded-2xl shadow-sm border max-w-2xl mx-auto space-y-4 text-xs">
-                <h3 className="font-serif font-bold text-base border-b pb-3 flex items-center gap-2"><i className="fa-solid fa-palette text-lg"></i> Control de Diseño Gráfico y Tienda</h3>
-                <form onSubmit={handleSaveConfig} className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="bg-gray-50 p-3 rounded-xl border">
-                      <label className="block font-semibold mb-1">Color Principal:</label>
-                      <div className="flex items-center gap-2"><input type="color" value={config.brandColor || '#768C77'} onChange={e=>setConfig({...config, brandColor: e.target.value})} className="w-10 h-8 rounded cursor-pointer" /><span className="font-mono">{config.brandColor}</span></div>
-                    </div>
-                    <div className="bg-gray-50 p-3 rounded-xl border">
-                      <label className="block font-semibold mb-1">Color Secundario / Acento:</label>
-                      <div className="flex items-center gap-2"><input type="color" value={config.secondaryColor || '#C8B297'} onChange={e=>setConfig({...config, secondaryColor: e.target.value})} className="w-10 h-8 rounded cursor-pointer" /><span className="font-mono">{config.secondaryColor}</span></div>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="bg-gray-50 p-3 rounded-xl border">
-                      <label className="block font-semibold mb-1">Color Fondo Tienda:</label>
-                      <div className="flex items-center gap-2"><input type="color" value={config.bgColor || '#FAFAF7'} onChange={e=>setConfig({...config, bgColor: e.target.value})} className="w-10 h-8 rounded cursor-pointer" /><span className="font-mono">{config.bgColor}</span></div>
-                    </div>
-                    <div className="bg-gray-50 p-3 rounded-xl border">
-                      <label className="block font-semibold mb-1">Color Cabecera / Footer:</label>
-                      <div className="flex items-center gap-2"><input type="color" value={config.headerBg || '#1C1F1D'} onChange={e=>setConfig({...config, headerBg: e.target.value})} className="w-10 h-8 rounded cursor-pointer" /><span className="font-mono">{config.headerBg}</span></div>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block font-semibold mb-1">Estilo de Tarjetas:</label>
-                      <select value={config.cardStyle || 'rounded'} onChange={e=>setConfig({...config, cardStyle: e.target.value})} className="w-full p-2.5 border rounded-xl bg-gray-50">
-                        <option value="rounded">Bordes Suaves y Sombra</option>
-                        <option value="modern">Moderno Redondeado (3XL)</option>
-                        <option value="glass">Cristal / Glassmorphism</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block font-semibold mb-1">Tipografía:</label>
-                      <select value={config.fontFamily || 'sans'} onChange={e=>setConfig({...config, fontFamily: e.target.value})} className="w-full p-2.5 border rounded-xl bg-gray-50">
-                        <option value="sans">Montserrat (Moderna)</option>
-                        <option value="serif">Playfair Display (Clásica/Elegante)</option>
-                        <option value="poppins">Poppins (Limpia)</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block font-semibold mb-1">Imagen de Fondo (URL opcional):</label>
-                    <input type="text" placeholder="https://imagen.com/fondo.jpg" value={config.bgImage || ''} onChange={e=>setConfig({...config, bgImage: e.target.value})} className="w-full p-2.5 border rounded-xl bg-gray-50 font-mono text-[11px]" />
-                  </div>
-
-                  <div className="border-t pt-3">
-                    <label className="block font-semibold mb-1">WhatsApp y Medios de Pago:</label>
-                    <div className="grid grid-cols-2 gap-2">
-                      <input type="text" value={config.whatsappNumber} onChange={e=>setConfig({...config, whatsappNumber: e.target.value})} className="p-2 border rounded-xl bg-gray-50 font-mono" />
-                      <input type="text" value={config.paymentMethods} onChange={e=>setConfig({...config, paymentMethods: e.target.value})} className="p-2 border rounded-xl bg-gray-50" />
-                    </div>
-                  </div>
-
-                  <div className="border-t pt-3">
-                    <label className="block font-semibold mb-1">Categorías de la Tienda</label>
-                    <div className="flex gap-2 mb-2">
-                      <input type="text" placeholder="Nueva categoría" value={newCategoryInput} onChange={e=>setNewCategoryInput(e.target.value)} className="flex-grow p-2 border rounded-xl bg-gray-50" />
-                      <button type="button" onClick={handleAddCategory} style={{ backgroundColor: primaryColor }} className="text-white px-4 py-2 rounded-xl">Agregar</button>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {(config.categories || []).map(cat => (
-                        <span key={cat} className="bg-gray-100 border px-3 py-1 rounded-full flex items-center gap-2">
-                          {cat} <button type="button" onClick={()=>handleRemoveCategory(cat)} className="text-red-500 font-bold">×</button>
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-
-                  <button type="submit" style={{ backgroundColor: primaryColor }} className="w-full text-white font-medium py-3 rounded-xl shadow">Guardar Cambios de Diseño</button>
-                </form>
-              </div>
-            )}
-
-            {tab === 'security' && (
-              <div className="bg-white p-6 rounded-2xl shadow-sm border max-w-lg mx-auto space-y-4 text-xs">
-                <h3 className="font-serif font-bold text-base border-b pb-3 flex items-center gap-2"><i className="fa-solid fa-shield-halved text-lg"></i> Seguridad y Contraseña</h3>
-                
-                <form onSubmit={handleChangePasswordInPanel} className="space-y-3">
-                  <p className="text-gray-600">Modifica tu contraseña de acceso al panel de administración:</p>
-                  {passChangeMsg && <p className={`p-2 rounded text-center ${passChangeMsg.includes('correctamente') ? 'bg-emerald-50 text-emerald-800' : 'bg-red-50 text-red-600'}`}>{passChangeMsg}</p>}
-                  <div><label className="block font-semibold mb-1">Contraseña Actual:</label><input type="password" value={currentPassChange} onChange={e=>setCurrentPassChange(e.target.value)} className="w-full p-2.5 border rounded-xl bg-gray-50" required /></div>
-                  <div><label className="block font-semibold mb-1">Nueva Contraseña:</label><input type="password" value={newPassChange} onChange={e=>setNewPassChange(e.target.value)} className="w-full p-2.5 border rounded-xl bg-gray-50" required /></div>
-                  <button type="submit" style={{ backgroundColor: primaryColor }} className="w-full text-white py-2.5 rounded-xl font-medium shadow">Actualizar Contraseña</button>
-                </form>
-
-                <div className="border-t pt-4 space-y-2">
-                  <label className="block font-semibold">Clave Secreta de Recuperación (para emergencias):</label>
-                  <input type="text" value={config.secretRecoveryKey || 'cordoba2026'} onChange={e=>setConfig({...config, secretRecoveryKey: e.target.value})} className="w-full p-2.5 border rounded-xl bg-gray-50 font-mono" />
-                  <p className="text-[11px] text-gray-500">Esta clave te permite restablecer el acceso si olvidas tu contraseña.</p>
-                </div>
-              </div>
-            )}
+            </div>
           </main>
         </div>
       );
