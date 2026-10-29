@@ -478,4 +478,226 @@
                 <div className="relative bg-gray-100 h-64">
                   <img src={activeModalImage || selectedProductModal.image} alt={selectedProductModal.title} className="w-full h-full object-cover" />
                   <button onClick={() => setSelectedProductModal(null)} className="absolute top-3 right-3 bg-black/60 text-white w-8 h-8 rounded-full flex items-center justify-center">
-                    <i className="fa-
+                    <i className="fa-solid fa-xmark"></i>
+                  </button>
+                </div>
+
+                {/* Miniaturas de galería si tiene */}
+                {selectedProductModal.gallery && selectedProductModal.gallery.length > 0 && (
+                  <div className="flex gap-2 p-3 bg-gray-50 border-b overflow-x-auto">
+                    <img 
+                      src={selectedProductModal.image} 
+                      onClick={() => setActiveModalImage(selectedProductModal.image)}
+                      className={`w-12 h-12 object-cover rounded-lg cursor-pointer border-2 ${activeModalImage === selectedProductModal.image ? 'border-[#768C77]' : 'border-transparent'}`} 
+                    />
+                    {selectedProductModal.gallery.map((imgUrl, idx) => (
+                      <img 
+                        key={idx} 
+                        src={imgUrl} 
+                        onClick={() => setActiveModalImage(imgUrl)}
+                        className={`w-12 h-12 object-cover rounded-lg cursor-pointer border-2 ${activeModalImage === imgUrl ? 'border-[#768C77]' : 'border-transparent'}`} 
+                      />
+                    ))}
+                  </div>
+                )}
+
+                {/* Video Demostrativo en Modal si existe */}
+                {selectedProductModal.video && (
+                  <div className="p-4 bg-black">
+                    <p className="text-white text-xs mb-2 font-semibold"><i className="fa-solid fa-play mr-1"></i> Video Demostrativo:</p>
+                    <video src={selectedProductModal.video} controls className="w-full h-48 object-contain rounded-xl"></video>
+                  </div>
+                )}
+
+                <div className="p-6 space-y-4">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <span style={{ color: primaryColor }} className="text-[10px] font-semibold uppercase tracking-widest">{selectedProductModal.category}</span>
+                      <h3 className="text-xl font-serif font-bold text-gray-800">{selectedProductModal.title}</h3>
+                    </div>
+                    <span style={{ color: primaryColor }} className="text-2xl font-serif font-bold">${Number(selectedProductModal.price).toLocaleString('es-AR')}</span>
+                  </div>
+
+                  <p className="text-xs text-gray-600 leading-relaxed font-light">{selectedProductModal.description}</p>
+                  
+                  {/* Calificaciones y Reseñas */}
+                  <div className="border-t pt-4 space-y-3">
+                    <h4 className="font-serif font-bold text-xs text-gray-800">Calificaciones y Reseñas de Clientes</h4>
+                    <div className="flex items-center gap-2">
+                      <div className="flex text-amber-400 text-sm">
+                        {[1, 2, 3, 4, 5].map(star => (
+                          <i key={star} className={`fa-solid fa-star ${star <= Math.round(selectedProductModal.rating || 5) ? 'text-amber-400' : 'text-gray-200'}`}></i>
+                        ))}
+                      </div>
+                      <span className="text-xs font-bold text-gray-700">{selectedProductModal.rating || '5.0'} / 5</span>
+                      <span className="text-xs text-gray-400">({selectedProductModal.reviews_count || 1} opiniones)</span>
+                    </div>
+
+                    <div className="bg-gray-50 p-3 rounded-xl border space-y-2 text-xs">
+                      <p className="font-medium text-gray-700">Dejá tu opinión sobre este producto:</p>
+                      <div className="flex gap-1 text-amber-400 text-lg">
+                        {[1, 2, 3, 4, 5].map(star => (
+                          <i 
+                            key={star} 
+                            onClick={() => setNewReviewRating(star)} 
+                            className={`fa-solid fa-star cursor-pointer ${star <= newReviewRating ? 'text-amber-400' : 'text-gray-300'}`}
+                          ></i>
+                        ))}
+                      </div>
+                      <textarea 
+                        placeholder="Escribí un comentario breve..." 
+                        value={newReviewText}
+                        onChange={e => setNewReviewText(e.target.value)}
+                        className="w-full p-2 border rounded-lg text-xs bg-white"
+                      ></textarea>
+                      <button 
+                        onClick={handleAddReview}
+                        style={{ backgroundColor: primaryColor }}
+                        className="text-white px-3 py-1.5 rounded-lg font-medium text-xs shadow-xs"
+                      >
+                        Enviar Calificación
+                      </button>
+                      {reviewSent && <p className="text-emerald-600 text-[11px] font-bold">¡Gracias por calificar el producto!</p>}
+                    </div>
+                  </div>
+
+                  <div className="border-t pt-4 flex gap-3">
+                    <button onClick={() => { addToCart(selectedProductModal); setSelectedProductModal(null); }} style={{ backgroundColor: primaryColor }} className="w-full text-white text-xs font-medium py-3 rounded-xl flex items-center justify-center gap-2 shadow">
+                      <i className="fa-solid fa-bag-shopping"></i> Agregar al Carrito
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Botón Flotante de WhatsApp */}
+          <div className="fixed bottom-6 right-6 z-40">
+            <a href={`https://wa.me/${config.whatsappNumber}`} target="_blank" rel="noopener noreferrer" style={{ backgroundColor: primaryColor }} className="text-white w-14 h-14 rounded-full flex items-center justify-center shadow-2xl border-2 border-white transition transform hover:scale-105">
+              <i className="fa-brands fa-whatsapp text-3xl"></i>
+            </a>
+          </div>
+
+          {/* Carrito y Checkout */}
+          {isCartOpen && (
+            <div className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-xs">
+              <div className="bg-white w-full max-w-md h-full flex flex-col justify-between shadow-2xl p-6 overflow-y-auto">
+                <div>
+                  <div className="flex justify-between items-center pb-4 border-b">
+                    <h3 className="font-serif text-lg text-gray-800 flex items-center gap-2">
+                      <i style={{ color: primaryColor }} className="fa-solid fa-bag-shopping"></i> Tu Pedido
+                    </h3>
+                    <button onClick={() => setIsCartOpen(false)} className="text-gray-400 hover:text-gray-600">
+                      <i className="fa-solid fa-xmark text-lg"></i>
+                    </button>
+                  </div>
+
+                  {cart.length === 0 ? (
+                    <div className="text-center py-12 text-gray-400">Tu carrito está vacío.</div>
+                  ) : (
+                    <div className="divide-y my-4 max-h-40 overflow-y-auto pr-1">
+                      {cart.map(item => (
+                        <div key={item.cartItemId} className="py-3 flex items-center justify-between text-xs">
+                          <div className="flex items-center gap-3">
+                            <img src={item.image} alt={item.title} className="w-12 h-12 object-cover rounded-xl border" />
+                            <div>
+                              <p className="font-serif font-bold text-gray-800">{item.title}</p>
+                              {item.selectedVariant && <p className="text-[10px] text-gray-500">Opción: {item.selectedVariant}</p>}
+                              <p className="text-gray-500">${Number(item.price).toLocaleString('es-AR')}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button onClick={() => updateQty(item.cartItemId, -1)} className="bg-gray-100 px-2 py-0.5 rounded font-bold">-</button>
+                            <span className="font-bold">{item.qty}</span>
+                            <button onClick={() => updateQty(item.cartItemId, 1)} className="bg-gray-100 px-2 py-0.5 rounded font-bold">+</button>
+                            <button onClick={() => removeFromCart(item.cartItemId)} className="text-red-400 hover:text-red-600 ml-1"><i className="fa-solid fa-trash-can"></i></button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {cart.length > 0 && (
+                  <div className="border-t pt-3 space-y-2.5 text-xs">
+                    <div>
+                      <label className="block font-semibold text-gray-700 mb-1">Nombre y Apellido: <span className="text-red-500">*</span></label>
+                      <input type="text" placeholder="Tu nombre completo..." value={clientName} onChange={(e) => { setClientName(e.target.value); setNameError(false); }} className={`w-full p-2 border rounded-xl bg-gray-100 ${nameError ? 'border-red-500' : 'border-gray-200'}`} />
+                    </div>
+
+                    <div>
+                      <label className="block font-semibold text-gray-700 mb-1">Método de Entrega:</label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button type="button" onClick={() => setFulfillmentType('delivery')} className={`p-2 rounded-xl border text-[11px] font-medium transition ${fulfillmentType === 'delivery' ? 'bg-gray-100 border-gray-400 font-bold' : 'border-gray-200'}`}>🚚 Envío a Domicilio</button>
+                        <button type="button" onClick={() => setFulfillmentType('pickup')} className={`p-2 rounded-xl border text-[11px] font-medium transition ${fulfillmentType === 'pickup' ? 'bg-gray-100 border-gray-400 font-bold' : 'border-gray-200'}`}>🏪 Retiro en Punto</button>
+                      </div>
+                    </div>
+
+                    {fulfillmentType === 'delivery' && (
+                      <>
+                        <div>
+                          <label className="block font-semibold text-gray-700 mb-1">Zona de Envío:</label>
+                          <select value={selectedDeliveryZone} onChange={(e) => setSelectedDeliveryZone(Number(e.target.value))} className="w-full p-2 border rounded-xl bg-gray-100">
+                            {config.deliveryZones && config.deliveryZones.map((zone, idx) => (
+                              <option key={idx} value={idx}>{zone.name} - ${zone.price.toLocaleString('es-AR')}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block font-semibold text-gray-700 mb-1">Dirección de Entrega: <span className="text-red-500">*</span></label>
+                          <input type="text" placeholder="Calle, Número, Barrio..." value={clientAddress} onChange={(e) => { setClientAddress(e.target.value); setAddressError(false); }} className={`w-full p-2 border rounded-xl bg-gray-100 ${addressError ? 'border-red-500' : 'border-gray-200'}`} />
+                        </div>
+                      </>
+                    )}
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block font-semibold text-gray-700 mb-1">DNI (Opcional):</label>
+                        <input type="text" placeholder="Ej: 35123456" value={clientDni} onChange={(e) => setClientDni(e.target.value)} className="w-full p-2 border rounded-xl bg-gray-100" />
+                      </div>
+                      <div>
+                        <label className="block font-semibold text-gray-700 mb-1">Horario Preferido:</label>
+                        <select value={preferredTime} onChange={(e) => setPreferredTime(e.target.value)} className="w-full p-2 border rounded-xl bg-gray-100">
+                          <option value="Indistinto">Indistinto</option>
+                          <option value="Mañana (9hs a 13hs)">Mañana (9hs a 13hs)</option>
+                          <option value="Tarde (14hs a 18hs)">Tarde (14hs a 18hs)</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block font-semibold text-gray-700 mb-1">Medio de Pago:</label>
+                      <select value={paymentMethodSelected} onChange={(e) => setPaymentMethodSelected(e.target.value)} className="w-full p-2 border rounded-xl bg-gray-100">
+                        <option value="Efectivo contra entrega">Efectivo contra entrega</option>
+                        <option value="Transferencia Bancaria (Alias: lvhogar.mp)">Transferencia (Alias: lvhogar.mp)</option>
+                        <option value="Mercado Pago">Mercado Pago</option>
+                      </select>
+                    </div>
+
+                    <div className="bg-gray-100 p-2.5 rounded-xl space-y-1">
+                      <div className="flex justify-between text-gray-600"><span>Subtotal:</span><span>${getSubtotal().toLocaleString('es-AR')}</span></div>
+                      <div className="flex justify-between text-gray-600"><span>Envío:</span><span>${getDeliveryCost().toLocaleString('es-AR')}</span></div>
+                      <div style={{ color: primaryColor }} className="flex justify-between font-serif font-bold border-t pt-1"><span>Total:</span><span>${getTotal().toLocaleString('es-AR')}</span></div>
+                    </div>
+
+                    <button onClick={handleCheckoutWhatsApp} style={{ backgroundColor: primaryColor }} className="w-full text-white font-medium py-2.5 rounded-xl flex items-center justify-center gap-2 shadow">
+                      <i className="fa-brands fa-whatsapp text-lg"></i> Confirmar Pedido por WhatsApp
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          <footer style={{ backgroundColor: headerBg }} className="text-gray-400 py-8 text-center text-xs mt-auto border-t border-white/10">
+            <p>© {new Date().getFullYear()} {config.storeName}. {config.locationText}.</p>
+            <a href="admin.html" className="text-gray-500 hover:text-white text-[10px] block mt-2">Acceso Administrador</a>
+          </footer>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(getElementById('root') || document.getElementById('root')).render(<CatalogApp />);
+  </script>
+</body>
+</html>
