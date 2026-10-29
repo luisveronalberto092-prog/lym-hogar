@@ -43,27 +43,20 @@
       storeName: "L&V HOGAR",
       storeSubtitle: "Artículos para el hogar y cuidado personal",
       whatsappNumber: "5493512102238",
-      whatsappMsg: "¡Hola L&V HOGAR! Quisiera realizar la siguiente compra:\n\n",
+      whatsappMsg: "¡Hola L&V HOGAR! Quisiera realizar el siguiente pedido:\n\n",
+      locationText: "Malvinas Argentinas y Córdoba Capital",
+      locationHours: "Lunes a Sábados: 09:00 a 20:00 hs",
       showBanner: true,
       bannerTitle: "Renueva tu Hogar con Estilo y Calidez",
       bannerText: "Envíos locales a domicilio y atención personalizada por WhatsApp.",
-      paymentMethods: "Efectivo contra entrega, Transferencia bancaria (Alias: lvhogar.mp) y Mercado Pago.",
+      paymentMethods: "Efectivo contra entrega, Transferencia (Alias: lvhogar.mp) y Mercado Pago.",
       brandColor: "#768C77",
       secondaryColor: "#C8B297",
       bgColor: "#FAFAF7",
       headerBg: "#1C1F1D",
-      cardStyle: "rounded",
       fontFamily: "sans",
-      bgImage: "",
       adminPassword: "admin123",
-      secretRecoveryKey: "cordoba2026",
-      categories: ["Hogar", "Cuidado Personal", "Electrodomésticos", "Bazar y Cocina", "Aromas y Decoración", "Accesorios"],
-      deliveryZones: [
-        { name: "Malvinas Argentinas - 1ª Sección", price: 0 },
-        { name: "Malvinas Argentinas - 2ª Sección", price: 500 },
-        { name: "Malvinas Argentinas - 3ª Sección", price: 800 },
-        { name: "Córdoba Capital (Otras zonas)", price: 1500 }
-      ]
+      categories: ["Hogar", "Cuidado Personal", "Electrodomésticos", "Bazar y Cocina", "Aromas y Decoración", "Accesorios"]
     };
 
     function AdminApp() {
@@ -76,9 +69,10 @@
       const [config, setConfig] = useState(() => JSON.parse(localStorage.getItem('lv_config')) || DEFAULT_CONFIG);
       const [products, setProducts] = useState([]);
       const [loadingList, setLoadingList] = useState(true);
+      const [orderHistory, setOrderHistory] = useState(() => JSON.parse(localStorage.getItem('lv_order_history')) || []);
       
       const [newProd, setNewProd] = useState({ 
-        sku: '', title: '', price: '', stock: '10', category: 'Hogar', image: '', description: '', variants: '' 
+        title: '', price: '', stock: '10', category: 'Hogar', image: '', video: '', description: '', variants: '' 
       });
       const [savedMessage, setSavedMessage] = useState('');
       const [isGeneratingAi, setIsGeneratingAi] = useState(false);
@@ -100,25 +94,30 @@
       };
 
       useEffect(() => {
-        if (isAuthenticated) {
-          fetchProductsFromSupabase();
-        }
+        if (isAuthenticated) fetchProductsFromSupabase();
       }, [isAuthenticated]);
 
       const primaryColor = config.brandColor || '#768C77';
 
+      const handleSaveConfig = (e) => {
+        e.preventDefault();
+        localStorage.setItem('lv_config', JSON.stringify(config));
+        setSavedMessage('¡Configuración de diseño guardada correctamente!');
+        setTimeout(() => setSavedMessage(''), 3000);
+      };
+
       const handleGenerateAiDescription = () => {
         if (!newProd.title.trim()) {
-          alert('Por favor escribe primero el título del producto.');
+          alert('Escribí primero el nombre del producto.');
           return;
         }
 
         setIsGeneratingAi(true);
         setTimeout(() => {
-          const autoDesc = `${newProd.title} ideal para transformar tus espacios. Fabricado con materiales resistentes y de excelente terminación. Producto práctico, cómodo y perfecto para el uso diario en tu hogar u oficina. ¡Disponible para entrega en Malvinas Argentinas y Córdoba Capital!`;
+          const autoDesc = `${newProd.title} de primera calidad para renovar tu hogar o rutina diaria. Diseño moderno, funcional y duradero. ¡Envíos locales rápidos en Malvinas Argentinas y Córdoba Capital!`;
           setNewProd(prev => ({ ...prev, description: autoDesc }));
           setIsGeneratingAi(false);
-        }, 800);
+        }, 600);
       };
 
       const handleLogin = (e) => {
@@ -140,6 +139,7 @@
             category: newProd.category,
             stock: parseInt(newProd.stock),
             image: newProd.image.trim() || 'https://images.unsplash.com/photo-1583847268964-b28dc8f51f92?auto=format&fit=crop&w=600&q=80',
+            video: newProd.video.trim(),
             description: newProd.description.trim(),
             variants: newProd.variants.trim()
           };
@@ -147,12 +147,12 @@
           const { error } = await supabaseClient.from('productos').insert([payload]);
           if (error) throw error;
 
-          setNewProd({ sku: '', title: '', price: '', stock: '10', category: config.categories?.[0] || 'Hogar', image: '', description: '', variants: '' });
-          setSavedMessage('¡Producto guardado en Supabase con éxito!');
+          setNewProd({ title: '', price: '', stock: '10', category: config.categories?.[0] || 'Hogar', image: '', video: '', description: '', variants: '' });
+          setSavedMessage('¡Producto cargado con éxito en Supabase!');
           fetchProductsFromSupabase();
           setTimeout(() => setSavedMessage(''), 3000);
         } catch (err) {
-          alert('Error al guardar el producto en la base de datos: ' + err.message);
+          alert('Error al guardar el producto: ' + err.message);
         }
       };
 
@@ -191,7 +191,6 @@
                 </div>
                 <button type="submit" style={{ backgroundColor: primaryColor }} className="w-full text-white py-2.5 rounded-xl text-xs font-medium shadow">Ingresar</button>
               </form>
-
               <a href="index.html" className="block text-center text-xs text-gray-400 hover:underline pt-2">Volver a la tienda</a>
             </div>
           </div>
@@ -203,7 +202,7 @@
           <header className="bg-[#1C1F1D] text-white p-4 flex justify-between items-center text-xs border-b border-white/10">
             <div className="flex items-center space-x-2">
               <span className="font-serif font-bold text-[#C8B297] text-sm">L&V HOGAR</span>
-              <span className="text-gray-400">| Sincronización Automática Supabase</span>
+              <span className="text-gray-400">| Control Total de la Web</span>
             </div>
             <div className="flex gap-4">
               <a href="index.html" target="_blank" className="text-[#C8B297] hover:underline flex items-center gap-1">Ver Tienda <i className="fa-solid fa-external-link text-[10px]"></i></a>
@@ -218,97 +217,190 @@
               </div>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="bg-white p-5 rounded-2xl shadow-sm border space-y-3 text-xs">
-                <h3 className="font-serif font-bold text-sm">Cargar Producto (Nube Directa)</h3>
-                <form onSubmit={handleAddProduct} className="space-y-3">
-                  <div>
-                    <label className="block font-medium mb-1">Título del Producto</label>
-                    <input type="text" value={newProd.title} onChange={e=>setNewProd({...newProd, title: e.target.value})} className="w-full p-2 border rounded-xl bg-gray-50" required />
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="block font-medium mb-1">Categoría</label>
-                      <select value={newProd.category} onChange={e=>setNewProd({...newProd, category: e.target.value})} className="w-full p-2 border rounded-xl bg-gray-50">
-                        {(config.categories || []).map(c=>(<option key={c} value={c}>{c}</option>))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block font-medium mb-1">Precio ($)</label>
-                      <input type="number" value={newProd.price} onChange={e=>setNewProd({...newProd, price: e.target.value})} className="w-full p-2 border rounded-xl font-bold bg-gray-50" required />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="block font-medium mb-1">Stock</label>
-                      <input type="number" value={newProd.stock} onChange={e=>setNewProd({...newProd, stock: e.target.value})} className="w-full p-2 border rounded-xl bg-gray-50" required />
-                    </div>
-                    <div>
-                      <label className="block font-medium mb-1">Variantes (opcional)</label>
-                      <input type="text" placeholder="Rojo, Azul, Talle S" value={newProd.variants} onChange={e=>setNewProd({...newProd, variants: e.target.value})} className="w-full p-2 border rounded-xl bg-gray-50" />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block font-medium mb-1">URL Foto Principal</label>
-                    <input type="text" placeholder="https://..." value={newProd.image} onChange={e=>setNewProd({...newProd, image: e.target.value})} className="w-full p-2 border rounded-xl bg-gray-50" />
-                  </div>
-                  <div>
-                    <div className="flex justify-between items-center mb-1">
-                      <label className="font-medium">Descripción</label>
-                      <button 
-                        type="button" 
-                        onClick={handleGenerateAiDescription} 
-                        disabled={isGeneratingAi}
-                        className="text-[10px] text-amber-700 bg-amber-100 hover:bg-amber-200 px-2 py-0.5 rounded-md font-semibold flex items-center gap-1"
-                      >
-                        <i className="fa-solid fa-wand-magic-sparkles"></i> {isGeneratingAi ? 'Redactando...' : 'Redactar con IA'}
-                      </button>
-                    </div>
-                    <textarea value={newProd.description} onChange={e=>setNewProd({...newProd, description: e.target.value})} className="w-full p-2 border rounded-xl h-20 bg-gray-50"></textarea>
-                  </div>
+            {/* Pestañas de Navegación */}
+            <div className="flex gap-2 border-b mb-6 text-xs font-medium">
+              <button onClick={() => setTab('products')} className={`pb-2 px-4 ${tab === 'products' ? 'border-b-2 border-[#768C77] text-[#768C77] font-bold' : 'text-gray-500'}`}>
+                📦 Productos Supabase
+              </button>
+              <button onClick={() => setTab('design')} className={`pb-2 px-4 ${tab === 'design' ? 'border-b-2 border-[#768C77] text-[#768C77] font-bold' : 'text-gray-500'}`}>
+                🎨 Diseño y Ubicación
+              </button>
+              <button onClick={() => setTab('history')} className={`pb-2 px-4 ${tab === 'history' ? 'border-b-2 border-[#768C77] text-[#768C77] font-bold' : 'text-gray-500'}`}>
+                📜 Historial de Pedidos
+              </button>
+            </div>
 
-                  <button type="submit" style={{ backgroundColor: primaryColor }} className="w-full text-white font-medium py-2.5 rounded-xl shadow">
-                    Guardar Producto en Supabase
-                  </button>
-                </form>
-              </div>
+            {tab === 'products' && (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {/* Formulario Carga de Producto */}
+                <div className="bg-white p-5 rounded-2xl shadow-sm border space-y-3 text-xs">
+                  <h3 className="font-serif font-bold text-sm">Cargar Producto Completo</h3>
+                  <form onSubmit={handleAddProduct} className="space-y-3">
+                    <div>
+                      <label className="block font-medium mb-1">Nombre del Producto</label>
+                      <input type="text" value={newProd.title} onChange={e=>setNewProd({...newProd, title: e.target.value})} className="w-full p-2 border rounded-xl bg-gray-50" required />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block font-medium mb-1">Categoría</label>
+                        <select value={newProd.category} onChange={e=>setNewProd({...newProd, category: e.target.value})} className="w-full p-2 border rounded-xl bg-gray-50">
+                          {(config.categories || []).map(c=>(<option key={c} value={c}>{c}</option>))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block font-medium mb-1">Precio ($)</label>
+                        <input type="number" value={newProd.price} onChange={e=>setNewProd({...newProd, price: e.target.value})} className="w-full p-2 border rounded-xl font-bold bg-gray-50" required />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block font-medium mb-1">Stock</label>
+                        <input type="number" value={newProd.stock} onChange={e=>setNewProd({...newProd, stock: e.target.value})} className="w-full p-2 border rounded-xl bg-gray-50" required />
+                      </div>
+                      <div>
+                        <label className="block font-medium mb-1">Variantes (opcional)</label>
+                        <input type="text" placeholder="Rojo, Azul, Talle S" value={newProd.variants} onChange={e=>setNewProd({...newProd, variants: e.target.value})} className="w-full p-2 border rounded-xl bg-gray-50" />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block font-medium mb-1">URL de la Foto</label>
+                      <input type="text" placeholder="https://..." value={newProd.image} onChange={e=>setNewProd({...newProd, image: e.target.value})} className="w-full p-2 border rounded-xl bg-gray-50" />
+                    </div>
+                    <div>
+                      <label className="block font-medium mb-1">URL del Video Demostrativo (MP4)</label>
+                      <input type="text" placeholder="https://...video.mp4" value={newProd.video} onChange={e=>setNewProd({...newProd, video: e.target.value})} className="w-full p-2 border rounded-xl bg-gray-50" />
+                    </div>
+                    <div>
+                      <div className="flex justify-between items-center mb-1">
+                        <label className="font-medium">Descripción</label>
+                        <button type="button" onClick={handleGenerateAiDescription} disabled={isGeneratingAi} className="text-[10px] text-amber-700 bg-amber-100 hover:bg-amber-200 px-2 py-0.5 rounded-md font-semibold">
+                          <i className="fa-solid fa-wand-magic-sparkles"></i> Redactar con IA
+                        </button>
+                      </div>
+                      <textarea value={newProd.description} onChange={e=>setNewProd({...newProd, description: e.target.value})} className="w-full p-2 border rounded-xl h-20 bg-gray-50"></textarea>
+                    </div>
 
-              <div className="bg-white p-5 rounded-2xl shadow-sm border space-y-3 text-xs md:col-span-2">
-                <h3 className="font-serif font-bold text-sm">Inventario en Tiempo Real ({products.length})</h3>
-                {loadingList ? (
-                  <div className="text-center py-10 text-gray-400">Cargando inventario de Supabase...</div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse">
-                      <thead>
-                        <tr className="border-b bg-gray-50 text-gray-600">
-                          <th className="p-2.5">Foto</th>
-                          <th className="p-2.5">Producto</th>
-                          <th className="p-2.5">Categoría</th>
-                          <th className="p-2.5">Precio</th>
-                          <th className="p-2.5">Stock</th>
-                          <th className="p-2.5 text-right">Acción</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {products.map(p => (
-                          <tr key={p.id} className="border-b hover:bg-gray-50">
-                            <td className="p-2.5"><img src={p.image || 'https://images.unsplash.com/photo-1583847268964-b28dc8f51f92?auto=format&fit=crop&w=600&q=80'} className="w-10 h-10 object-cover rounded-lg border" /></td>
-                            <td className="p-2.5 font-semibold">{p.title}</td>
-                            <td className="p-2.5 text-gray-500">{p.category}</td>
-                            <td style={{ color: primaryColor }} className="p-2.5 font-serif font-bold">${Number(p.price).toLocaleString('es-AR')}</td>
-                            <td className="p-2.5"><span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${Number(p.stock) > 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}`}>{p.stock} un.</span></td>
-                            <td className="p-2.5 text-right">
-                              <button onClick={() => handleDeleteProduct(p.id)} className="text-red-400 hover:text-red-600"><i className="fa-solid fa-trash"></i></button>
-                            </td>
+                    <button type="submit" style={{ backgroundColor: primaryColor }} className="w-full text-white font-medium py-2.5 rounded-xl shadow">
+                      Guardar Producto en Supabase
+                    </button>
+                  </form>
+                </div>
+
+                {/* Inventario */}
+                <div className="bg-white p-5 rounded-2xl shadow-sm border space-y-3 text-xs md:col-span-2">
+                  <h3 className="font-serif font-bold text-sm">Inventario en Tiempo Real ({products.length})</h3>
+                  {loadingList ? (
+                    <div className="text-center py-10 text-gray-400">Cargando inventario de Supabase...</div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse">
+                        <thead>
+                          <tr className="border-b bg-gray-50 text-gray-600">
+                            <th className="p-2.5">Foto</th>
+                            <th className="p-2.5">Producto</th>
+                            <th className="p-2.5">Categoría</th>
+                            <th className="p-2.5">Precio</th>
+                            <th className="p-2.5">Stock</th>
+                            <th className="p-2.5 text-right">Acción</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                        </thead>
+                        <tbody>
+                          {products.map(p => (
+                            <tr key={p.id} className="border-b hover:bg-gray-50">
+                              <td className="p-2.5"><img src={p.image || 'https://images.unsplash.com/photo-1583847268964-b28dc8f51f92?auto=format&fit=crop&w=600&q=80'} className="w-10 h-10 object-cover rounded-lg border" /></td>
+                              <td className="p-2.5 font-semibold">{p.title}</td>
+                              <td className="p-2.5 text-gray-500">{p.category}</td>
+                              <td style={{ color: primaryColor }} className="p-2.5 font-serif font-bold">${Number(p.price).toLocaleString('es-AR')}</td>
+                              <td className="p-2.5"><span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${Number(p.stock) > 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}`}>{p.stock} un.</span></td>
+                              <td className="p-2.5 text-right">
+                                <button onClick={() => handleDeleteProduct(p.id)} className="text-red-400 hover:text-red-600"><i className="fa-solid fa-trash"></i></button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {tab === 'design' && (
+              <form onSubmit={handleSaveConfig} className="bg-white p-6 rounded-2xl shadow-sm border space-y-4 text-xs max-w-2xl">
+                <h3 className="font-serif font-bold text-sm">Configuración de la Marca, Ubicación y Colores</h3>
+                
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block font-medium mb-1">Nombre de la Tienda</label>
+                    <input type="text" value={config.storeName} onChange={e=>setConfig({...config, storeName: e.target.value})} className="w-full p-2 border rounded-xl bg-gray-50" />
+                  </div>
+                  <div>
+                    <label className="block font-medium mb-1">Teléfono WhatsApp</label>
+                    <input type="text" value={config.whatsappNumber} onChange={e=>setConfig({...config, whatsappNumber: e.target.value})} className="w-full p-2 border rounded-xl bg-gray-50" />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block font-medium mb-1">Ubicación visible</label>
+                    <input type="text" value={config.locationText} onChange={e=>setConfig({...config, locationText: e.target.value})} className="w-full p-2 border rounded-xl bg-gray-50" />
+                  </div>
+                  <div>
+                    <label className="block font-medium mb-1">Horarios de atención</label>
+                    <input type="text" value={config.locationHours} onChange={e=>setConfig({...config, locationHours: e.target.value})} className="w-full p-2 border rounded-xl bg-gray-50" />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <label className="block font-medium mb-1">Color Principal</label>
+                    <input type="color" value={config.brandColor} onChange={e=>setConfig({...config, brandColor: e.target.value})} className="w-full h-9 p-1 border rounded-xl cursor-pointer" />
+                  </div>
+                  <div>
+                    <label className="block font-medium mb-1">Color Secundario</label>
+                    <input type="color" value={config.secondaryColor} onChange={e=>setConfig({...config, secondaryColor: e.target.value})} className="w-full h-9 p-1 border rounded-xl cursor-pointer" />
+                  </div>
+                  <div>
+                    <label className="block font-medium mb-1">Tipografía</label>
+                    <select value={config.fontFamily} onChange={e=>setConfig({...config, fontFamily: e.target.value})} className="w-full p-2 border rounded-xl bg-gray-50">
+                      <option value="sans">Montserrat</option>
+                      <option value="serif">Playfair Display</option>
+                      <option value="poppins">Poppins</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block font-medium mb-1">Título Banner Promocional</label>
+                  <input type="text" value={config.bannerTitle} onChange={e=>setConfig({...config, bannerTitle: e.target.value})} className="w-full p-2 border rounded-xl bg-gray-50" />
+                </div>
+
+                <button type="submit" style={{ backgroundColor: primaryColor }} className="text-white font-medium px-6 py-2.5 rounded-xl shadow">
+                  Guardar Configuración de Diseño
+                </button>
+              </form>
+            )}
+
+            {tab === 'history' && (
+              <div className="bg-white p-6 rounded-2xl shadow-sm border space-y-4 text-xs">
+                <h3 className="font-serif font-bold text-sm">Historial de Pedidos Recibidos</h3>
+                {orderHistory.length === 0 ? (
+                  <p className="text-gray-400">No hay registros recientes de pedidos.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {orderHistory.map(ord => (
+                      <div key={ord.id} className="p-3 border rounded-xl bg-gray-50 flex justify-between items-center">
+                        <div>
+                          <p className="font-bold text-gray-800">Pedido #{ord.id} - {ord.date}</p>
+                          <p className="text-gray-500">{ord.items.length} productos | Estado: {ord.status}</p>
+                        </div>
+                        <span style={{ color: primaryColor }} className="font-serif font-bold text-sm">${ord.total.toLocaleString('es-AR')}</span>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
-            </div>
+            )}
           </main>
         </div>
       );
