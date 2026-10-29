@@ -74,6 +74,7 @@
       const [newProd, setNewProd] = useState({ 
         title: '', price: '', stock: '10', category: 'Hogar', image: '', video: '', description: '', variants: '' 
       });
+      const [additionalImages, setAdditionalImages] = useState([]);
       const [savedMessage, setSavedMessage] = useState('');
       const [isGeneratingAi, setIsGeneratingAi] = useState(false);
 
@@ -98,6 +99,34 @@
       }, [isAuthenticated]);
 
       const primaryColor = config.brandColor || '#768C77';
+
+      // Convertir archivos locales de cualquier dispositivo (celular/compu) a Base64 URL
+      const handleFileSelection = (e, type) => {
+        const files = Array.from(e.target.files);
+        if (files.length === 0) return;
+
+        if (type === 'main') {
+          const reader = new FileReader();
+          reader.onload = (uploadEvent) => {
+            setNewProd(prev => ({ ...prev, image: uploadEvent.target.result }));
+          };
+          reader.readAsDataURL(files[0]);
+        } else if (type === 'gallery') {
+          files.forEach(file => {
+            const reader = new FileReader();
+            reader.onload = (uploadEvent) => {
+              setAdditionalImages(prev => [...prev, uploadEvent.target.result]);
+            };
+            reader.readAsDataURL(file);
+          });
+        } else if (type === 'video') {
+          const reader = new FileReader();
+          reader.onload = (uploadEvent) => {
+            setNewProd(prev => ({ ...prev, video: uploadEvent.target.result }));
+          };
+          reader.readAsDataURL(files[0]);
+        }
+      };
 
       const handleSaveConfig = (e) => {
         e.preventDefault();
@@ -140,6 +169,7 @@
             stock: parseInt(newProd.stock),
             image: newProd.image.trim() || 'https://images.unsplash.com/photo-1583847268964-b28dc8f51f92?auto=format&fit=crop&w=600&q=80',
             video: newProd.video.trim(),
+            gallery: additionalImages,
             description: newProd.description.trim(),
             variants: newProd.variants.trim()
           };
@@ -148,7 +178,8 @@
           if (error) throw error;
 
           setNewProd({ title: '', price: '', stock: '10', category: config.categories?.[0] || 'Hogar', image: '', video: '', description: '', variants: '' });
-          setSavedMessage('¡Producto cargado con éxito en Supabase!');
+          setAdditionalImages([]);
+          setSavedMessage('¡Producto con múltiples fotos guardado con éxito en Supabase!');
           fetchProductsFromSupabase();
           setTimeout(() => setSavedMessage(''), 3000);
         } catch (err) {
@@ -217,10 +248,9 @@
               </div>
             )}
 
-            {/* Pestañas de Navegación */}
             <div className="flex gap-2 border-b mb-6 text-xs font-medium">
               <button onClick={() => setTab('products')} className={`pb-2 px-4 ${tab === 'products' ? 'border-b-2 border-[#768C77] text-[#768C77] font-bold' : 'text-gray-500'}`}>
-                📦 Productos Supabase
+                📦 Productos y Archivos Multidial
               </button>
               <button onClick={() => setTab('design')} className={`pb-2 px-4 ${tab === 'design' ? 'border-b-2 border-[#768C77] text-[#768C77] font-bold' : 'text-gray-500'}`}>
                 🎨 Diseño y Ubicación
@@ -232,14 +262,16 @@
 
             {tab === 'products' && (
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {/* Formulario Carga de Producto */}
+                
+                {/* Formulario Carga de Producto con Múltiples Archivos */}
                 <div className="bg-white p-5 rounded-2xl shadow-sm border space-y-3 text-xs">
-                  <h3 className="font-serif font-bold text-sm">Cargar Producto Completo</h3>
+                  <h3 className="font-serif font-bold text-sm">Cargar Producto (Fotos y Video)</h3>
                   <form onSubmit={handleAddProduct} className="space-y-3">
                     <div>
                       <label className="block font-medium mb-1">Nombre del Producto</label>
                       <input type="text" value={newProd.title} onChange={e=>setNewProd({...newProd, title: e.target.value})} className="w-full p-2 border rounded-xl bg-gray-50" required />
                     </div>
+
                     <div className="grid grid-cols-2 gap-2">
                       <div>
                         <label className="block font-medium mb-1">Categoría</label>
@@ -252,6 +284,7 @@
                         <input type="number" value={newProd.price} onChange={e=>setNewProd({...newProd, price: e.target.value})} className="w-full p-2 border rounded-xl font-bold bg-gray-50" required />
                       </div>
                     </div>
+
                     <div className="grid grid-cols-2 gap-2">
                       <div>
                         <label className="block font-medium mb-1">Stock</label>
@@ -262,14 +295,54 @@
                         <input type="text" placeholder="Rojo, Azul, Talle S" value={newProd.variants} onChange={e=>setNewProd({...newProd, variants: e.target.value})} className="w-full p-2 border rounded-xl bg-gray-50" />
                       </div>
                     </div>
-                    <div>
-                      <label className="block font-medium mb-1">URL de la Foto</label>
-                      <input type="text" placeholder="https://..." value={newProd.image} onChange={e=>setNewProd({...newProd, image: e.target.value})} className="w-full p-2 border rounded-xl bg-gray-50" />
+
+                    {/* Foto Principal con Selector de Archivos (Celular / PC) */}
+                    <div className="bg-gray-50 p-2.5 rounded-xl border space-y-1">
+                      <label className="block font-medium text-gray-700">📸 Foto Principal (Desde Dispositivo o URL):</label>
+                      <input 
+                        type="file" 
+                        accept="image/*" 
+                        onChange={(e) => handleFileSelection(e, 'main')} 
+                        className="w-full text-[11px] text-gray-500 file:mr-2 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-[#768C77] file:text-white hover:file:opacity-90"
+                      />
+                      <input type="text" placeholder="O pegá URL https://..." value={newProd.image} onChange={e=>setNewProd({...newProd, image: e.target.value})} className="w-full p-1.5 border rounded-lg bg-white mt-1" />
+                      {newProd.image && <img src={newProd.image} className="w-16 h-16 object-cover rounded-lg mt-1 border" />}
                     </div>
-                    <div>
-                      <label className="block font-medium mb-1">URL del Video Demostrativo (MP4)</label>
-                      <input type="text" placeholder="https://...video.mp4" value={newProd.video} onChange={e=>setNewProd({...newProd, video: e.target.value})} className="w-full p-2 border rounded-xl bg-gray-50" />
+
+                    {/* Múltiples Fotos / Galería */}
+                    <div className="bg-gray-50 p-2.5 rounded-xl border space-y-1">
+                      <label className="block font-medium text-gray-700">🖼️ Fotos Secundarias (Galería múltiple):</label>
+                      <input 
+                        type="file" 
+                        accept="image/*" 
+                        multiple
+                        onChange={(e) => handleFileSelection(e, 'gallery')} 
+                        className="w-full text-[11px] text-gray-500 file:mr-2 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-gray-700 file:text-white hover:file:opacity-90"
+                      />
+                      {additionalImages.length > 0 && (
+                        <div className="flex gap-1.5 mt-2 overflow-x-auto pb-1">
+                          {additionalImages.map((img, idx) => (
+                            <div key={idx} className="relative">
+                              <img src={img} className="w-12 h-12 object-cover rounded-lg border" />
+                              <button type="button" onClick={() => setAdditionalImages(additionalImages.filter((_, i) => i !== idx))} className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 text-[9px] flex items-center justify-center">×</button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
+
+                    {/* Video Demostrativo */}
+                    <div className="bg-gray-50 p-2.5 rounded-xl border space-y-1">
+                      <label className="block font-medium text-gray-700">🎬 Video Demostrativo (MP4):</label>
+                      <input 
+                        type="file" 
+                        accept="video/mp4,video/*" 
+                        onChange={(e) => handleFileSelection(e, 'video')} 
+                        className="w-full text-[11px] text-gray-500 file:mr-2 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-amber-700 file:text-white hover:file:opacity-90"
+                      />
+                      <input type="text" placeholder="O pegá URL del video..." value={newProd.video} onChange={e=>setNewProd({...newProd, video: e.target.value})} className="w-full p-1.5 border rounded-lg bg-white mt-1" />
+                    </div>
+
                     <div>
                       <div className="flex justify-between items-center mb-1">
                         <label className="font-medium">Descripción</label>
