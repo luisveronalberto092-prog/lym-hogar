@@ -43,18 +43,19 @@
       storeName: "L&V HOGAR",
       storeSubtitle: "Artículos para el hogar y cuidado personal",
       whatsappNumber: "5493512102238",
-      whatsappMsg: "¡Hola L&V HOGAR! Quisiera realizar la siguiente compra:\n\n",
+      whatsappMsg: "¡Hola L&V HOGAR! Quisiera realizar el siguiente pedido:\n\n",
+      locationText: "Malvinas Argentinas y Córdoba Capital",
+      locationHours: "Lunes a Sábados: 09:00 a 20:00 hs",
       showBanner: true,
       bannerTitle: "Renueva tu Hogar con Estilo y Calidez",
       bannerText: "Envíos locales a domicilio y atención personalizada por WhatsApp.",
-      paymentMethods: "Efectivo contra entrega, Transferencia bancaria (Alias: lvhogar.mp) y Mercado Pago.",
+      paymentMethods: "Efectivo contra entrega, Transferencia (Alias: lvhogar.mp) y Mercado Pago.",
       brandColor: "#768C77",
       secondaryColor: "#C8B297",
       bgColor: "#FAFAF7",
       headerBg: "#1C1F1D",
       cardStyle: "rounded",
       fontFamily: "sans",
-      bgImage: "",
       categories: ["Hogar", "Cuidado Personal", "Electrodomésticos", "Bazar y Cocina", "Aromas y Decoración", "Accesorios"],
       deliveryZones: [
         { name: "Malvinas Argentinas - 1ª Sección", price: 0 },
@@ -78,22 +79,28 @@
       
       const [isAiChatOpen, setIsAiChatOpen] = useState(false);
       const [aiMessages, setAiMessages] = useState([
-        { sender: 'bot', text: '¡Hola! Soy el asistente virtual de L&V HOGAR. ¿En qué te puedo ayudar hoy?' }
+        { sender: 'bot', text: '¡Hola! Soy el asistente virtual de L&V HOGAR. Puedo ayudarte con productos, envíos a Malvinas Argentinas/Córdoba o medios de pago. ¿Qué buscas hoy?' }
       ]);
       const [aiInput, setAiInput] = useState('');
       const [isAiLoading, setIsAiLoading] = useState(false);
 
       const [fulfillmentType, setFulfillmentType] = useState('delivery');
       const [selectedDeliveryZone, setSelectedDeliveryZone] = useState(0);
+      const [clientName, setClientName] = useState('');
       const [clientAddress, setClientAddress] = useState('');
       const [clientDni, setClientDni] = useState('');
       const [preferredTime, setPreferredTime] = useState('Indistinto');
       const [paymentMethodSelected, setPaymentMethodSelected] = useState('Efectivo contra entrega');
       
       const [addressError, setAddressError] = useState(false);
-      const [copySuccess, setCopySuccess] = useState(false);
+      const [nameError, setNameError] = useState(false);
       const [quantities, setQuantities] = useState({});
       const [chosenVariant, setChosenVariant] = useState({});
+
+      // Reseñas en el modal
+      const [newReviewText, setNewReviewText] = useState('');
+      const [newReviewRating, setNewReviewRating] = useState(5);
+      const [reviewSent, setReviewSent] = useState(false);
 
       const fetchProductsFromSupabase = async () => {
         try {
@@ -105,7 +112,7 @@
           if (error) throw error;
           setProducts(data || []);
         } catch (err) {
-          console.error("Error al obtener productos desde Supabase:", err);
+          console.error("Error al obtener productos:", err);
         } finally {
           setLoadingProducts(false);
         }
@@ -113,8 +120,6 @@
 
       useEffect(() => {
         fetchProductsFromSupabase();
-
-        // Escuchar actualizaciones en tiempo real
         const channel = supabaseClient
           .channel('schema-db-changes')
           .on('postgres_changes', { event: '*', schema: 'public', table: 'productos' }, () => {
@@ -122,18 +127,14 @@
           })
           .subscribe();
 
-        return () => {
-          supabaseClient.removeChannel(channel);
-        };
+        return () => { supabaseClient.removeChannel(channel); };
       }, []);
 
       const primaryColor = config.brandColor || '#768C77';
       const secondaryColor = config.secondaryColor || '#C8B297';
       const bgColor = config.bgColor || '#FAFAF7';
       const headerBg = config.headerBg || '#1C1F1D';
-      
       const fontClass = config.fontFamily === 'serif' ? 'font-serif' : config.fontFamily === 'poppins' ? 'font-poppins' : 'font-sans';
-      const cardRadius = config.cardStyle === 'modern' ? 'rounded-3xl shadow-lg' : config.cardStyle === 'glass' ? 'rounded-2xl backdrop-blur-md bg-white/80 shadow-lg' : 'rounded-2xl shadow-sm';
 
       const handleSendAiMessage = async (e) => {
         e.preventDefault();
@@ -145,28 +146,29 @@
         setIsAiLoading(true);
 
         setTimeout(() => {
-          const queryLower = userText.toLowerCase();
+          const q = userText.toLowerCase();
           let botReply = "";
-          const matchedProducts = products.filter(p => 
-            p.title?.toLowerCase().includes(queryLower) || 
-            p.description?.toLowerCase().includes(queryLower) ||
-            p.category?.toLowerCase().includes(queryLower)
+
+          const matched = products.filter(p => 
+            p.title?.toLowerCase().includes(q) || 
+            p.description?.toLowerCase().includes(q) ||
+            p.category?.toLowerCase().includes(q)
           );
 
-          if (queryLower.includes('envio') || queryLower.includes('entrega') || queryLower.includes('zona')) {
-            botReply = `Hacemos envíos locales en Malvinas Argentinas (1ª, 2ª y 3ª sección) y en Córdoba Capital. ¡Puedes seleccionar tu zona al confirmar el carrito!`;
-          } else if (queryLower.includes('pago') || queryLower.includes('tarjeta') || queryLower.includes('transferencia')) {
-            botReply = `Aceptamos: ${config.paymentMethods || 'Efectivo, Transferencia Bancaria y Mercado Pago'}.`;
-          } else if (matchedProducts.length > 0) {
-            const prodListStr = matchedProducts.slice(0, 3).map(p => `• ${p.title} - $${Number(p.price).toLocaleString('es-AR')}`).join('\n');
-            botReply = `Encontré estas opciones en nuestro catálogo:\n\n${prodListStr}\n\n¿Te gustaría ver alguno en detalle?`;
+          if (q.includes('envio') || q.includes('donde') || q.includes('ubica') || q.includes('zona') || q.includes('direccion')) {
+            botReply = `📍 Nos encontramos en ${config.locationText || 'Malvinas Argentinas y Córdoba Capital'}.\n⏰ Horarios: ${config.locationHours}\n🚚 Envíos a domicilio en 1ª, 2ª y 3ª Sección de Malvinas Argentinas y Córdoba Capital.`;
+          } else if (q.includes('pago') || q.includes('alias') || q.includes('transferencia') || q.includes('tarjeta')) {
+            botReply = `💳 Medios de Pago Disponibles:\n• Efectivo contra entrega\n• Transferencia bancaria (Alias: lvhogar.mp)\n• Mercado Pago`;
+          } else if (matched.length > 0) {
+            const listStr = matched.slice(0, 3).map(p => `• *${p.title}* - $${Number(p.price).toLocaleString('es-AR')}`).join('\n');
+            botReply = `Encontré estos productos en nuestro catálogo en tiempo real:\n\n${listStr}\n\n¿Te gustaría sumar alguno al carrito?`;
           } else {
-            botReply = `¡Gracias por consultar! Contamos con una amplia variedad en artículos para el hogar y cuidado personal. Si quieres atención directa, escríbenos por WhatsApp al ${config.whatsappNumber}.`;
+            botReply = `¡Gracias por tu mensaje! Contamos con amplio catálogo en artículos para el hogar y cuidado personal. Podés escribirnos directo al WhatsApp ${config.whatsappNumber} para atención personalizada.`;
           }
 
           setAiMessages(prev => [...prev, { sender: 'bot', text: botReply }]);
           setIsAiLoading(false);
-        }, 600);
+        }, 500);
       };
 
       const handleQtyChange = (productId, delta) => {
@@ -175,10 +177,6 @@
           const updated = current + delta;
           return { ...prev, [productId]: updated > 0 ? updated : 1 };
         });
-      };
-
-      const handleVariantSelect = (productId, variantVal) => {
-        setChosenVariant(prev => ({ ...prev, [productId]: variantVal }));
       };
 
       const addToCart = (product) => {
@@ -220,77 +218,80 @@
       };
       const getTotal = () => getSubtotal() + getDeliveryCost();
 
-      const handleSingleProductWhatsApp = (product) => {
-        const varString = (product.variants && product.variants.trim()) ? ` (Opción: ${chosenVariant[product.id] || product.variants.split(',')[0].trim()})` : '';
-        const skuStr = product.sku ? ` [SKU: ${product.sku}]` : '';
-        const message = `¡Hola ${config.storeName}! Me interesa consultar por este producto:\n\n• *${product.title}*${skuStr}${varString} - $${Number(product.price).toLocaleString('es-AR')}\n\n¿Hay stock disponible?`;
-        window.open(`https://wa.me/${config.whatsappNumber}?text=${encodeURIComponent(message)}`, '_blank');
-      };
-
-      const handleShareProduct = (product) => {
-        const text = `¡Mirá este producto de ${config.storeName}!\n*${product.title}* - $${Number(product.price).toLocaleString('es-AR')}\n${product.description}`;
-        if (navigator.share) {
-          navigator.share({ title: product.title, text: text, url: window.location.href }).catch(() => {});
-        } else {
-          window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank');
-        }
-      };
-
       const generateOrderText = () => {
-        let message = config.whatsappMsg || "¡Hola! Quisiera realizar la siguiente compra:\n\n";
+        let message = config.whatsappMsg || "¡Hola L&V HOGAR! Quisiera realizar el siguiente pedido:\n\n";
+        
+        if (clientName.trim()) message += `👤 *Cliente:* ${clientName.trim()}\n`;
+        
+        message += `🛒 *PRODUCTOS:*\n`;
         cart.forEach(item => {
           const varText = item.selectedVariant ? ` [${item.selectedVariant}]` : '';
-          const skuText = item.sku ? ` (SKU: ${item.sku})` : '';
-          message += `• *${item.title}*${skuText}${varText} x${item.qty} - $${(Number(item.price) * item.qty).toLocaleString('es-AR')}\n`;
+          message += `• ${item.title}${varText} x${item.qty} - $${(Number(item.price) * item.qty).toLocaleString('es-AR')}\n`;
         });
 
-        message += `\n*Subtotal:* $${getSubtotal().toLocaleString('es-AR')}`;
+        message += `\n💵 *Subtotal:* $${getSubtotal().toLocaleString('es-AR')}`;
 
         if (fulfillmentType === 'delivery') {
           const zone = config.deliveryZones ? config.deliveryZones[selectedDeliveryZone] : { name: "Estándar", price: 0 };
-          message += `\n*Tipo de Entrega:* Envío a Domicilio`;
-          message += `\n*Zona:* ${zone.name} ($${zone.price.toLocaleString('es-AR')})`;
-          message += `\n*Dirección:* ${clientAddress.trim()}`;
+          message += `\n🚚 *Entrega:* Envío a Domicilio (${zone.name} - $${zone.price.toLocaleString('es-AR')})`;
+          message += `\n📍 *Dirección:* ${clientAddress.trim()}`;
         } else {
-          message += `\n*Tipo de Entrega:* Retiro en Local`;
+          message += `\n🏪 *Entrega:* Retiro en Punto / Local`;
         }
 
-        if (clientDni.trim()) message += `\n*DNI:* ${clientDni.trim()}`;
-        message += `\n*Horario:* ${preferredTime}`;
-        message += `\n*Pago:* ${paymentMethodSelected}`;
-        message += `\n*TOTAL FINAL:* $${getTotal().toLocaleString('es-AR')}\n\n¿Cómo coordinamos?`;
+        if (clientDni.trim()) message += `\n🆔 *DNI:* ${clientDni.trim()}`;
+        message += `\n⏰ *Horario Preferido:* ${preferredTime}`;
+        message += `\n💳 *Medio de Pago:* ${paymentMethodSelected}`;
+        message += `\n\n💰 *TOTAL FINAL:* $${getTotal().toLocaleString('es-AR')}\n\n¿Me confirman la recepción del pedido?`;
         return message;
       };
 
       const handleCheckoutWhatsApp = () => {
         if (cart.length === 0) return;
-        if (fulfillmentType === 'delivery' && !clientAddress.trim()) {
-          setAddressError(true);
-          return;
-        }
-        setAddressError(false);
+        if (!clientName.trim()) { setNameError(true); return; } else setNameError(false);
+        if (fulfillmentType === 'delivery' && !clientAddress.trim()) { setAddressError(true); return; } else setAddressError(false);
+
+        // Guardar pedido en historial de la sesión local para el cliente
+        const currentHistory = JSON.parse(localStorage.getItem('lv_order_history')) || [];
+        const newOrder = {
+          id: Date.now(),
+          date: new Date().toLocaleString('es-AR'),
+          items: cart,
+          total: getTotal(),
+          status: 'Enviado por WhatsApp'
+        };
+        localStorage.setItem('lv_order_history', JSON.stringify([newOrder, ...currentHistory]));
+
         window.open(`https://wa.me/${config.whatsappNumber}?text=${encodeURIComponent(generateOrderText())}`, '_blank');
       };
 
-      const handleCopyOrder = () => {
-        if (fulfillmentType === 'delivery' && !clientAddress.trim()) {
-          setAddressError(true);
-          return;
+      const handleAddReview = async () => {
+        if (!selectedProductModal) return;
+        try {
+          const currentRating = Number(selectedProductModal.rating || 5);
+          const currentCount = Number(selectedProductModal.reviews_count || 1);
+          
+          const newCount = currentCount + 1;
+          const newAvg = ((currentRating * currentCount) + newReviewRating) / newCount;
+
+          await supabaseClient
+            .from('productos')
+            .update({ rating: newAvg.toFixed(1), reviews_count: newCount })
+            .eq('id', selectedProductModal.id);
+
+          setReviewSent(true);
+          setTimeout(() => { setReviewSent(false); setNewReviewText(''); }, 3000);
+          fetchProductsFromSupabase();
+        } catch (err) {
+          console.error("Error al enviar reseña:", err);
         }
-        setAddressError(false);
-        navigator.clipboard.writeText(generateOrderText()).then(() => {
-          setCopySuccess(true);
-          setTimeout(() => setCopySuccess(false), 3000);
-        });
       };
 
       const categories = ['Todos', ...(config.categories || ["Hogar", "Cuidado Personal", "Electrodomésticos"])];
-      
       const filteredProducts = products.filter(p => {
         const matchesCat = selectedCategory === 'Todos' || p.category === selectedCategory;
         const matchesSearch = p.title?.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                              p.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                              (p.sku && p.sku.toLowerCase().includes(searchQuery.toLowerCase()));
+                              p.description?.toLowerCase().includes(searchQuery.toLowerCase());
         return matchesCat && matchesSearch;
       }).sort((a, b) => {
         if (sortBy === 'low-high') return Number(a.price) - Number(b.price);
@@ -299,21 +300,15 @@
       });
 
       return (
-        <div 
-          style={{ 
-            backgroundColor: bgColor,
-            backgroundImage: config.bgImage ? `url(${config.bgImage})` : 'none',
-            backgroundSize: 'cover',
-            backgroundAttachment: 'fixed'
-          }} 
-          className={`min-h-screen flex flex-col relative text-gray-800 ${fontClass}`}
-        >
-          <div style={{ backgroundColor: primaryColor }} className="text-white text-[11px] py-1.5 px-4 text-center tracking-wide font-light flex justify-center items-center gap-4">
-            <span><i className="fa-solid fa-truck-fast mr-1"></i> Envíos locales en Malvinas Argentinas y Córdoba</span>
-            <span className="hidden md:inline">|</span>
-            <span className="hidden md:inline"><i className="fa-solid fa-wallet mr-1"></i> {config.paymentMethods}</span>
+        <div style={{ backgroundColor: bgColor }} className={`min-h-screen flex flex-col text-gray-800 ${fontClass}`}>
+          {/* Barra Superior Informativa */}
+          <div style={{ backgroundColor: primaryColor }} className="text-white text-[11px] py-1.5 px-4 text-center tracking-wide font-light flex justify-center items-center gap-4 flex-wrap">
+            <span><i className="fa-solid fa-location-dot mr-1"></i> {config.locationText || "Malvinas Argentinas y Córdoba Capital"}</span>
+            <span className="hidden sm:inline">|</span>
+            <span><i className="fa-solid fa-clock mr-1"></i> {config.locationHours || "Lun a Sáb: 9 a 20hs"}</span>
           </div>
 
+          {/* Encabezado Principal */}
           <header style={{ backgroundColor: headerBg }} className="text-white shadow-md sticky top-0 z-40 border-b border-white/10">
             <div className="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
               <div className="flex items-center space-x-3">
@@ -341,20 +336,22 @@
             </div>
           </header>
 
+          {/* Banner Promocional */}
           {config.showBanner && (
-            <section style={{ backgroundColor: headerBg }} className="text-white py-10 px-4 text-center border-b border-white/10">
+            <section style={{ backgroundColor: headerBg }} className="text-white py-8 px-4 text-center border-b border-white/10">
               <div className="max-w-3xl mx-auto">
                 <span style={{ backgroundColor: secondaryColor + '30', color: secondaryColor }} className="text-[10px] font-semibold uppercase tracking-widest px-4 py-1 rounded-full border border-white/20">
-                  CATÁLOGO OFICIAL
+                  CATÁLOGO ONLINE OFICIAL
                 </span>
-                <h2 className="text-2xl md:text-3xl font-serif font-normal text-white mt-3 tracking-wide">{config.bannerTitle}</h2>
-                <p className="mt-2 text-gray-300 text-xs md:text-sm tracking-wide font-light">{config.bannerText}</p>
+                <h2 className="text-2xl md:text-3xl font-serif text-white mt-3">{config.bannerTitle}</h2>
+                <p className="mt-2 text-gray-300 text-xs md:text-sm font-light">{config.bannerText}</p>
               </div>
             </section>
           )}
 
+          {/* Filtros y Buscador */}
           <main className="max-w-7xl mx-auto px-4 py-8 flex-grow w-full">
-            <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4 bg-white/90 backdrop-blur p-4 rounded-2xl shadow-sm border border-gray-200">
+            <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4 bg-white/90 p-4 rounded-2xl shadow-sm border border-gray-200">
               <div className="flex gap-2 overflow-x-auto w-full md:w-auto pb-1 md:pb-0">
                 {categories.map(cat => (
                   <button
@@ -376,7 +373,7 @@
                   onChange={(e) => setSortBy(e.target.value)}
                   className="bg-gray-100 border border-gray-200 rounded-full px-3 py-2 text-xs text-gray-700 focus:outline-none"
                 >
-                  <option value="default">Ordenar: Destacados</option>
+                  <option value="default">Destacados</option>
                   <option value="low-high">Precio: Menor a Mayor</option>
                   <option value="high-low">Precio: Mayor a Menor</option>
                 </select>
@@ -385,7 +382,7 @@
                   <i style={{ color: primaryColor }} className="fa-solid fa-magnifying-glass absolute left-3.5 top-3 text-xs"></i>
                   <input
                     type="text"
-                    placeholder="Buscar producto o SKU..."
+                    placeholder="Buscar producto..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="w-full pl-9 pr-4 py-2 bg-gray-100 border border-gray-200 rounded-full text-xs focus:outline-none"
@@ -394,6 +391,7 @@
               </div>
             </div>
 
+            {/* Grilla de Productos */}
             {loadingProducts ? (
               <div className="text-center py-20 text-gray-500">
                 <i className="fa-solid fa-spinner animate-spin text-2xl mb-2"></i>
@@ -411,10 +409,17 @@
                   const activeVariant = chosenVariant[product.id] || (variantsList.length > 0 ? variantsList[0] : '');
 
                   return (
-                    <div key={product.id} className={`bg-white transition overflow-hidden border border-gray-200 flex flex-col justify-between ${cardRadius}`}>
+                    <div key={product.id} className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden flex flex-col justify-between hover:shadow-md transition">
                       <div>
                         <div className="relative h-52 bg-gray-100 overflow-hidden cursor-pointer group" onClick={() => setSelectedProductModal(product)}>
                           <img src={product.image || 'https://images.unsplash.com/photo-1583847268964-b28dc8f51f92?auto=format&fit=crop&w=600&q=80'} alt={product.title} className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
+                          
+                          {product.video && (
+                            <span style={{ backgroundColor: primaryColor }} className="absolute bottom-3 left-3 text-white text-[10px] font-bold px-2.5 py-1 rounded-lg flex items-center gap-1 shadow">
+                              <i className="fa-solid fa-play"></i> Video Demostrativo
+                            </span>
+                          )}
+
                           <span className={`absolute top-3 right-3 text-[10px] font-semibold px-2.5 py-0.5 rounded-full shadow ${
                             isAvailable ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'
                           }`}>
@@ -423,36 +428,32 @@
                         </div>
 
                         <div className="p-5">
-                          <div className="flex justify-between items-start">
+                          <div className="flex justify-between items-center">
                             <span style={{ color: primaryColor }} className="text-[10px] font-semibold uppercase tracking-widest">{product.category}</span>
-                            <button onClick={() => handleShareProduct(product)} className="text-gray-400 hover:text-gray-600 text-xs">
-                              <i className="fa-solid fa-share-nodes"></i>
-                            </button>
+                            <div className="flex items-center gap-1 text-amber-400 text-xs font-bold">
+                              <i className="fa-solid fa-star"></i>
+                              <span className="text-gray-600 text-[11px]">{product.rating || '5.0'}</span>
+                            </div>
                           </div>
                           <h3 className="font-serif text-base text-gray-800 mt-1 cursor-pointer hover:opacity-80 transition" onClick={() => setSelectedProductModal(product)}>
                             {product.title}
                           </h3>
-                          {product.sku && <p className="text-[10px] text-gray-400 font-mono">SKU: {product.sku}</p>}
                           <p className="text-gray-500 text-xs mt-2 font-light line-clamp-2">{product.description}</p>
                         </div>
                       </div>
 
                       <div className="p-5 pt-0 space-y-3">
                         <div className="flex justify-between items-center">
-                          <div>
-                            <span style={{ color: primaryColor }} className="text-lg font-serif font-bold">${Number(product.price).toLocaleString('es-AR')}</span>
-                          </div>
-                          <button onClick={() => handleSingleProductWhatsApp(product)} style={{ color: primaryColor }} className="hover:opacity-80 text-xs font-semibold flex items-center gap-1 bg-gray-100 px-2.5 py-1.5 rounded-lg">
-                            <i className="fa-brands fa-whatsapp text-sm"></i> Consultar
-                          </button>
+                          <span style={{ color: primaryColor }} className="text-lg font-serif font-bold">${Number(product.price).toLocaleString('es-AR')}</span>
+                          <button onClick={() => setSelectedProductModal(product)} className="text-xs text-gray-500 hover:underline">Ver detalle</button>
                         </div>
 
                         {hasVariants && (
                           <div className="space-y-1">
-                            <label className="block text-[11px] font-semibold text-gray-700">Variante:</label>
+                            <label className="block text-[11px] font-semibold text-gray-700">Opción:</label>
                             <select 
                               value={activeVariant}
-                              onChange={(e) => handleVariantSelect(product.id, e.target.value)}
+                              onChange={(e) => setChosenVariant(prev => ({ ...prev, [product.id]: e.target.value }))}
                               className="w-full p-2 bg-gray-100 border border-gray-200 rounded-xl text-xs text-gray-700"
                             >
                               {variantsList.map((v, idx) => (<option key={idx} value={v}>{v}</option>))}
@@ -463,10 +464,9 @@
                         {isAvailable ? (
                           <div className="flex items-center justify-between bg-gray-100 p-1 rounded-xl border border-gray-200">
                             <div className="flex items-center gap-2 px-2">
-                              <span className="text-[11px] text-gray-500">Cant:</span>
-                              <button onClick={() => handleQtyChange(product.id, -1)} className="w-6 h-6 bg-white rounded-md font-bold text-gray-600 shadow-xs">-</button>
+                              <button onClick={() => handleQtyChange(product.id, -1)} className="w-6 h-6 bg-white rounded font-bold text-gray-600 shadow-xs">-</button>
                               <span className="text-xs font-bold w-4 text-center">{currentQty}</span>
-                              <button onClick={() => handleQtyChange(product.id, 1)} className="w-6 h-6 bg-white rounded-md font-bold text-gray-600 shadow-xs">+</button>
+                              <button onClick={() => handleQtyChange(product.id, 1)} className="w-6 h-6 bg-white rounded font-bold text-gray-600 shadow-xs">+</button>
                             </div>
                             <button onClick={() => addToCart(product)} style={{ backgroundColor: primaryColor }} className="text-white px-3 py-1.5 rounded-lg font-medium text-xs shadow-xs hover:opacity-90">
                               Agregar
@@ -483,28 +483,112 @@
             )}
           </main>
 
+          {/* Modal de Detalle + Video + Reseñas */}
+          {selectedProductModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
+              <div className="bg-white rounded-2xl max-w-lg w-full overflow-hidden shadow-2xl border border-gray-200 max-h-[90vh] overflow-y-auto">
+                {selectedProductModal.video ? (
+                  <div className="relative bg-black h-64">
+                    <video src={selectedProductModal.video} controls autoPlay className="w-full h-full object-contain"></video>
+                    <button onClick={() => setSelectedProductModal(null)} className="absolute top-3 right-3 bg-black/60 text-white w-8 h-8 rounded-full flex items-center justify-center">
+                      <i className="fa-solid fa-xmark"></i>
+                    </button>
+                  </div>
+                ) : (
+                  <div className="relative h-64 bg-gray-100">
+                    <img src={selectedProductModal.image} alt={selectedProductModal.title} className="w-full h-full object-cover" />
+                    <button onClick={() => setSelectedProductModal(null)} className="absolute top-3 right-3 bg-black/60 text-white w-8 h-8 rounded-full flex items-center justify-center">
+                      <i className="fa-solid fa-xmark"></i>
+                    </button>
+                  </div>
+                )}
+
+                <div className="p-6 space-y-4">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <span style={{ color: primaryColor }} className="text-[10px] font-semibold uppercase tracking-widest">{selectedProductModal.category}</span>
+                      <h3 className="text-xl font-serif font-bold text-gray-800">{selectedProductModal.title}</h3>
+                    </div>
+                    <span style={{ color: primaryColor }} className="text-2xl font-serif font-bold">${Number(selectedProductModal.price).toLocaleString('es-AR')}</span>
+                  </div>
+
+                  <p className="text-xs text-gray-600 leading-relaxed font-light">{selectedProductModal.description}</p>
+                  
+                  {/* Calificaciones y Reseñas */}
+                  <div className="border-t pt-4 space-y-3">
+                    <h4 className="font-serif font-bold text-xs text-gray-800">Calificaciones y Reseñas de Clientes</h4>
+                    <div className="flex items-center gap-2">
+                      <div className="flex text-amber-400 text-sm">
+                        {[1, 2, 3, 4, 5].map(star => (
+                          <i key={star} className={`fa-solid fa-star ${star <= Math.round(selectedProductModal.rating || 5) ? 'text-amber-400' : 'text-gray-200'}`}></i>
+                        ))}
+                      </div>
+                      <span className="text-xs font-bold text-gray-700">{selectedProductModal.rating || '5.0'} / 5</span>
+                      <span className="text-xs text-gray-400">({selectedProductModal.reviews_count || 1} opiniones)</span>
+                    </div>
+
+                    <div className="bg-gray-50 p-3 rounded-xl border space-y-2 text-xs">
+                      <p className="font-medium text-gray-700">Dejá tu opinión sobre este producto:</p>
+                      <div className="flex gap-1 text-amber-400 text-lg">
+                        {[1, 2, 3, 4, 5].map(star => (
+                          <i 
+                            key={star} 
+                            onClick={() => setNewReviewRating(star)} 
+                            className={`fa-solid fa-star cursor-pointer ${star <= newReviewRating ? 'text-amber-400' : 'text-gray-300'}`}
+                          ></i>
+                        ))}
+                      </div>
+                      <textarea 
+                        placeholder="Escribí un comentario breve..." 
+                        value={newReviewText}
+                        onChange={e => setNewReviewText(e.target.value)}
+                        className="w-full p-2 border rounded-lg text-xs bg-white"
+                      ></textarea>
+                      <button 
+                        onClick={handleAddReview}
+                        style={{ backgroundColor: primaryColor }}
+                        className="text-white px-3 py-1.5 rounded-lg font-medium text-xs shadow-xs"
+                      >
+                        Enviar Calificación
+                      </button>
+                      {reviewSent && <p className="text-emerald-600 text-[11px] font-bold">¡Gracias por calificar el producto!</p>}
+                    </div>
+                  </div>
+
+                  <div className="border-t pt-4 flex gap-3">
+                    <button onClick={() => { addToCart(selectedProductModal); setSelectedProductModal(null); }} style={{ backgroundColor: primaryColor }} className="w-full text-white text-xs font-medium py-3 rounded-xl flex items-center justify-center gap-2 shadow">
+                      <i className="fa-solid fa-bag-shopping"></i> Agregar al Carrito
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Botones Flotantes de IA y WhatsApp */}
           <div className="fixed bottom-6 right-6 flex flex-col gap-3 z-40">
             <button 
               onClick={() => setIsAiChatOpen(!isAiChatOpen)}
               style={{ backgroundColor: secondaryColor }}
-              className="text-black w-14 h-14 rounded-full flex items-center justify-center shadow-2xl transition transform hover:scale-105 border-2 border-white"
+              className="text-black w-14 h-14 rounded-full flex items-center justify-center shadow-2xl border-2 border-white"
               title="Asistente Virtual IA"
             >
               <i className="fa-solid fa-robot text-2xl"></i>
             </button>
-            <a href={`https://wa.me/${config.whatsappNumber}`} target="_blank" rel="noopener noreferrer" style={{ backgroundColor: primaryColor }} className="text-white w-14 h-14 rounded-full flex items-center justify-center shadow-2xl transition transform hover:scale-105 border-2 border-white">
+            <a href={`https://wa.me/${config.whatsappNumber}`} target="_blank" rel="noopener noreferrer" style={{ backgroundColor: primaryColor }} className="text-white w-14 h-14 rounded-full flex items-center justify-center shadow-2xl border-2 border-white">
               <i className="fa-brands fa-whatsapp text-3xl"></i>
             </a>
           </div>
 
+          {/* Chat Asistente IA */}
           {isAiChatOpen && (
             <div className="fixed bottom-24 right-6 w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-gray-200 z-50 overflow-hidden flex flex-col h-96">
               <div style={{ backgroundColor: headerBg }} className="p-3 text-white flex justify-between items-center border-b border-white/10">
                 <div className="flex items-center gap-2">
                   <i style={{ color: secondaryColor }} className="fa-solid fa-robot text-lg"></i>
                   <div>
-                    <h4 className="text-xs font-bold">Asistente IA - L&V HOGAR</h4>
-                    <p className="text-[9px] text-gray-300">Responde consultas al instante</p>
+                    <h4 className="text-xs font-bold">Asistente L&V HOGAR</h4>
+                    <p className="text-[9px] text-gray-300">Responde sobre envíos y productos</p>
                   </div>
                 </div>
                 <button onClick={() => setIsAiChatOpen(false)} className="text-gray-400 hover:text-white">
@@ -516,25 +600,19 @@
                 {aiMessages.map((msg, idx) => (
                   <div key={idx} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
                     <div className={`p-2.5 rounded-xl max-w-[80%] whitespace-pre-line ${
-                      msg.sender === 'user' ? 'bg-[#768C77] text-white rounded-br-none' : 'bg-white border text-gray-800 shadow-xs rounded-bl-none'
+                      msg.sender === 'user' ? 'bg-[#768C77] text-white' : 'bg-white border text-gray-800 shadow-xs'
                     }`}>
                       {msg.text}
                     </div>
                   </div>
                 ))}
-                {isAiLoading && (
-                  <div className="flex justify-start">
-                    <div className="bg-white p-2.5 rounded-xl border text-gray-400 text-xs flex items-center gap-1">
-                      <i className="fa-solid fa-spinner animate-spin"></i> Pensando respuesta...
-                    </div>
-                  </div>
-                )}
+                {isAiLoading && <div className="text-gray-400 text-xs p-2">Escribiendo...</div>}
               </div>
 
               <form onSubmit={handleSendAiMessage} className="p-2 bg-white border-t flex gap-1">
                 <input 
                   type="text" 
-                  placeholder="Pregunta sobre productos o envíos..." 
+                  placeholder="Preguntá por productos, pagos o envíos..." 
                   value={aiInput} 
                   onChange={e => setAiInput(e.target.value)} 
                   className="flex-grow p-2 border rounded-xl text-xs bg-gray-50 focus:outline-none"
@@ -546,13 +624,14 @@
             </div>
           )}
 
+          {/* Lateral del Carrito y Datos del Cliente */}
           {isCartOpen && (
             <div className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-xs">
               <div className="bg-white w-full max-w-md h-full flex flex-col justify-between shadow-2xl p-6 overflow-y-auto">
                 <div>
                   <div className="flex justify-between items-center pb-4 border-b">
                     <h3 className="font-serif text-lg text-gray-800 flex items-center gap-2">
-                      <i style={{ color: primaryColor }} className="fa-solid fa-bag-shopping"></i> Carrito de Compras
+                      <i style={{ color: primaryColor }} className="fa-solid fa-bag-shopping"></i> Tu Pedido
                     </h3>
                     <button onClick={() => setIsCartOpen(false)} className="text-gray-400 hover:text-gray-600">
                       <i className="fa-solid fa-xmark text-lg"></i>
@@ -566,7 +645,7 @@
                       {cart.map(item => (
                         <div key={item.cartItemId} className="py-3 flex items-center justify-between text-xs">
                           <div className="flex items-center gap-3">
-                            <img src={item.image} alt={item.title} className="w-12 h-12 object-cover rounded-xl" />
+                            <img src={item.image} alt={item.title} className="w-12 h-12 object-cover rounded-xl border" />
                             <div>
                               <p className="font-serif font-bold text-gray-800">{item.title}</p>
                               {item.selectedVariant && <p className="text-[10px] text-gray-500">Opción: {item.selectedVariant}</p>}
@@ -577,7 +656,7 @@
                             <button onClick={() => updateQty(item.cartItemId, -1)} className="bg-gray-100 px-2 py-0.5 rounded font-bold">-</button>
                             <span className="font-bold">{item.qty}</span>
                             <button onClick={() => updateQty(item.cartItemId, 1)} className="bg-gray-100 px-2 py-0.5 rounded font-bold">+</button>
-                            <button onClick={() => removeFromCart(item.cartItemId)} className="text-red-400 hover:text-red-600 ml-2"><i className="fa-solid fa-trash-can"></i></button>
+                            <button onClick={() => removeFromCart(item.cartItemId)} className="text-red-400 hover:text-red-600 ml-1"><i className="fa-solid fa-trash-can"></i></button>
                           </div>
                         </div>
                       ))}
@@ -588,10 +667,15 @@
                 {cart.length > 0 && (
                   <div className="border-t pt-3 space-y-2.5 text-xs">
                     <div>
+                      <label className="block font-semibold text-gray-700 mb-1">Nombre y Apellido: <span className="text-red-500">*</span></label>
+                      <input type="text" placeholder="Tu nombre completo..." value={clientName} onChange={(e) => { setClientName(e.target.value); setNameError(false); }} className={`w-full p-2 border rounded-xl bg-gray-100 ${nameError ? 'border-red-500' : 'border-gray-200'}`} />
+                    </div>
+
+                    <div>
                       <label className="block font-semibold text-gray-700 mb-1">Método de Entrega:</label>
                       <div className="grid grid-cols-2 gap-2">
                         <button type="button" onClick={() => setFulfillmentType('delivery')} className={`p-2 rounded-xl border text-[11px] font-medium transition ${fulfillmentType === 'delivery' ? 'bg-gray-100 border-gray-400 font-bold' : 'border-gray-200'}`}>🚚 Envío a Domicilio</button>
-                        <button type="button" onClick={() => setFulfillmentType('pickup')} className={`p-2 rounded-xl border text-[11px] font-medium transition ${fulfillmentType === 'pickup' ? 'bg-gray-100 border-gray-400 font-bold' : 'border-gray-200'}`}>🏪 Retiro en Local</button>
+                        <button type="button" onClick={() => setFulfillmentType('pickup')} className={`p-2 rounded-xl border text-[11px] font-medium transition ${fulfillmentType === 'pickup' ? 'bg-gray-100 border-gray-400 font-bold' : 'border-gray-200'}`}>🏪 Retiro en Punto</button>
                       </div>
                     </div>
 
@@ -607,7 +691,7 @@
                         </div>
                         <div>
                           <label className="block font-semibold text-gray-700 mb-1">Dirección de Entrega: <span className="text-red-500">*</span></label>
-                          <input type="text" placeholder="Calle, Número, Barrio..." value={clientAddress} onChange={(e) => { setClientAddress(e.target.value); if(e.target.value.trim()) setAddressError(false); }} className={`w-full p-2 border rounded-xl bg-gray-100 ${addressError ? 'border-red-500' : 'border-gray-200'}`} />
+                          <input type="text" placeholder="Calle, Número, Barrio..." value={clientAddress} onChange={(e) => { setClientAddress(e.target.value); setAddressError(false); }} className={`w-full p-2 border rounded-xl bg-gray-100 ${addressError ? 'border-red-500' : 'border-gray-200'}`} />
                         </div>
                       </>
                     )}
@@ -631,7 +715,7 @@
                       <label className="block font-semibold text-gray-700 mb-1">Medio de Pago:</label>
                       <select value={paymentMethodSelected} onChange={(e) => setPaymentMethodSelected(e.target.value)} className="w-full p-2 border rounded-xl bg-gray-100">
                         <option value="Efectivo contra entrega">Efectivo contra entrega</option>
-                        <option value="Transferencia Bancaria / Alias">Transferencia Bancaria / Alias</option>
+                        <option value="Transferencia Bancaria (Alias: lvhogar.mp)">Transferencia (Alias: lvhogar.mp)</option>
                         <option value="Mercado Pago">Mercado Pago</option>
                       </select>
                     </div>
@@ -652,7 +736,7 @@
           )}
 
           <footer style={{ backgroundColor: headerBg }} className="text-gray-400 py-8 text-center text-xs mt-auto border-t border-white/10">
-            <p>© {new Date().getFullYear()} {config.storeName}. Todos los derechos reservados.</p>
+            <p>© {new Date().getFullYear()} {config.storeName}. {config.locationText}.</p>
             <a href="admin.html" className="text-gray-500 hover:text-white text-[10px] block mt-2">Acceso Administrador</a>
           </footer>
         </div>
