@@ -36,7 +36,7 @@
     const { useState, useEffect } = React;
 
     const SUPABASE_URL = "https://cleduaakmebcnldqeaoo.supabase.co";
-    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNsZWR1YWFrbWViY25sZHFlYW9vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMyMjYxMzgsImV4cCI6MjEwODgwMjEzOH0.Wl1DsflvOJLNDCaCjdNyaGe91KpCH7zpqZGJVDOpH2s";
+    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNsZWR1YWFrbWViY25sZHFlYW9vIwgicm9sZSI6ImFub24iLCJpYXQiOjE3OTMyMjYxMzgsImV4cCI6MjEwODgwMjEzOH0.Wl1DsflvOJLNDCaCjdNyaGe91KpCH7zpqZGJVDOpH2s";
     const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
     const DEFAULT_CONFIG = {
@@ -97,7 +97,6 @@
       const [quantities, setQuantities] = useState({});
       const [chosenVariant, setChosenVariant] = useState({});
 
-      // Reseñas en el modal
       const [newReviewText, setNewReviewText] = useState('');
       const [newReviewRating, setNewReviewRating] = useState(5);
       const [reviewSent, setReviewSent] = useState(false);
@@ -135,6 +134,16 @@
       const bgColor = config.bgColor || '#FAFAF7';
       const headerBg = config.headerBg || '#1C1F1D';
       const fontClass = config.fontFamily === 'serif' ? 'font-serif' : config.fontFamily === 'poppins' ? 'font-poppins' : 'font-sans';
+
+      const getCategoryIcon = (cat) => {
+        const lower = cat.toLowerCase();
+        if (lower.includes('hogar')) return 'fa-house-chimney';
+        if (lower.includes('cuidado') || lower.includes('personal')) return 'fa-spa';
+        if (lower.includes('electro')) return 'fa-bolt';
+        if (lower.includes('bazar') || lower.includes('cocina')) return 'fa-utensils';
+        if (lower.includes('aroma') || lower.includes('deco')) return 'fa-wand-magic-sparkles';
+        return 'fa-box-open';
+      };
 
       const handleSendAiMessage = async (e) => {
         e.preventDefault();
@@ -251,7 +260,6 @@
         if (!clientName.trim()) { setNameError(true); return; } else setNameError(false);
         if (fulfillmentType === 'delivery' && !clientAddress.trim()) { setAddressError(true); return; } else setAddressError(false);
 
-        // Guardar pedido en historial de la sesión local para el cliente
         const currentHistory = JSON.parse(localStorage.getItem('lv_order_history')) || [];
         const newOrder = {
           id: Date.now(),
@@ -301,14 +309,12 @@
 
       return (
         <div style={{ backgroundColor: bgColor }} className={`min-h-screen flex flex-col text-gray-800 ${fontClass}`}>
-          {/* Barra Superior Informativa */}
           <div style={{ backgroundColor: primaryColor }} className="text-white text-[11px] py-1.5 px-4 text-center tracking-wide font-light flex justify-center items-center gap-4 flex-wrap">
             <span><i className="fa-solid fa-location-dot mr-1"></i> {config.locationText || "Malvinas Argentinas y Córdoba Capital"}</span>
             <span className="hidden sm:inline">|</span>
             <span><i className="fa-solid fa-clock mr-1"></i> {config.locationHours || "Lun a Sáb: 9 a 20hs"}</span>
           </div>
 
-          {/* Encabezado Principal */}
           <header style={{ backgroundColor: headerBg }} className="text-white shadow-md sticky top-0 z-40 border-b border-white/10">
             <div className="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
               <div className="flex items-center space-x-3">
@@ -336,7 +342,6 @@
             </div>
           </header>
 
-          {/* Banner Promocional */}
           {config.showBanner && (
             <section style={{ backgroundColor: headerBg }} className="text-white py-8 px-4 text-center border-b border-white/10">
               <div className="max-w-3xl mx-auto">
@@ -349,45 +354,68 @@
             </section>
           )}
 
-          {/* Filtros y Buscador */}
           <main className="max-w-7xl mx-auto px-4 py-8 flex-grow w-full">
-            <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4 bg-white/90 p-4 rounded-2xl shadow-sm border border-gray-200">
-              <div className="flex gap-2 overflow-x-auto w-full md:w-auto pb-1 md:pb-0">
-                {categories.map(cat => (
-                  <button
-                    key={cat}
-                    onClick={() => setSelectedCategory(cat)}
-                    style={selectedCategory === cat ? { backgroundColor: primaryColor } : {}}
-                    className={`px-5 py-2 rounded-full text-xs font-medium tracking-wide whitespace-nowrap transition ${
-                      selectedCategory === cat ? 'text-white shadow-sm' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                    }`}
-                  >
-                    {cat}
+            
+            {/* NUEVA BARRA DE CATEGORÍAS MODERNA TIPO TARJETAS CON ICONOS */}
+            <div className="mb-8">
+              <div className="flex justify-between items-center mb-3">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500">Explorar por Categoría</h3>
+                {selectedCategory !== 'Todos' && (
+                  <button onClick={() => setSelectedCategory('Todos')} className="text-xs text-[#768C77] font-semibold hover:underline">
+                    Ver todos
                   </button>
-                ))}
+                )}
               </div>
 
-              <div className="flex gap-2 w-full md:w-auto">
-                <select 
-                  value={sortBy} 
-                  onChange={(e) => setSortBy(e.target.value)}
-                  className="bg-gray-100 border border-gray-200 rounded-full px-3 py-2 text-xs text-gray-700 focus:outline-none"
-                >
-                  <option value="default">Destacados</option>
-                  <option value="low-high">Precio: Menor a Mayor</option>
-                  <option value="high-low">Precio: Mayor a Menor</option>
-                </select>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-3">
+                {categories.map(cat => {
+                  const isSelected = selectedCategory === cat;
+                  const iconName = cat === 'Todos' ? 'fa-border-all' : getCategoryIcon(cat);
 
-                <div className="relative w-full md:w-60">
-                  <i style={{ color: primaryColor }} className="fa-solid fa-magnifying-glass absolute left-3.5 top-3 text-xs"></i>
-                  <input
-                    type="text"
-                    placeholder="Buscar producto..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-9 pr-4 py-2 bg-gray-100 border border-gray-200 rounded-full text-xs focus:outline-none"
-                  />
-                </div>
+                  return (
+                    <button
+                      key={cat}
+                      onClick={() => setSelectedCategory(cat)}
+                      style={isSelected ? { backgroundColor: primaryColor, borderColor: primaryColor } : {}}
+                      className={`p-3.5 rounded-2xl border text-left transition flex flex-col justify-between items-start group shadow-xs ${
+                        isSelected 
+                          ? 'text-white shadow-md transform -translate-y-0.5' 
+                          : 'bg-white border-gray-200 text-gray-700 hover:border-gray-400 hover:bg-gray-50'
+                      }`}
+                    >
+                      <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-xs transition ${
+                        isSelected ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600 group-hover:bg-gray-200'
+                      }`}>
+                        <i className={`fa-solid ${iconName}`}></i>
+                      </div>
+                      <span className="font-semibold text-xs tracking-tight mt-3 line-clamp-1">{cat}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Barra de Búsqueda y Ordenar */}
+            <div className="flex justify-end items-center mb-8 gap-3">
+              <select 
+                value={sortBy} 
+                onChange={(e) => setSortBy(e.target.value)}
+                className="bg-white border border-gray-200 rounded-full px-4 py-2.5 text-xs text-gray-700 focus:outline-none shadow-xs"
+              >
+                <option value="default">Destacados</option>
+                <option value="low-high">Precio: Menor a Mayor</option>
+                <option value="high-low">Precio: Mayor a Menor</option>
+              </select>
+
+              <div className="relative w-full sm:w-72">
+                <i style={{ color: primaryColor }} className="fa-solid fa-magnifying-glass absolute left-4 top-3 text-xs"></i>
+                <input
+                  type="text"
+                  placeholder="Buscar producto..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-full text-xs focus:outline-none shadow-xs"
+                />
               </div>
             </div>
 
@@ -398,7 +426,7 @@
                 <p>Cargando productos en tiempo real...</p>
               </div>
             ) : filteredProducts.length === 0 ? (
-              <div className="text-center py-20 text-gray-400">No se encontraron productos disponibles.</div>
+              <div className="text-center py-20 text-gray-400">No se encontraron productos en esta categoría.</div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                 {filteredProducts.map(product => {
@@ -514,7 +542,6 @@
 
                   <p className="text-xs text-gray-600 leading-relaxed font-light">{selectedProductModal.description}</p>
                   
-                  {/* Calificaciones y Reseñas */}
                   <div className="border-t pt-4 space-y-3">
                     <h4 className="font-serif font-bold text-xs text-gray-800">Calificaciones y Reseñas de Clientes</h4>
                     <div className="flex items-center gap-2">
@@ -565,7 +592,7 @@
             </div>
           )}
 
-          {/* Botones Flotantes de IA y WhatsApp */}
+          {/* Botones Flotantes */}
           <div className="fixed bottom-6 right-6 flex flex-col gap-3 z-40">
             <button 
               onClick={() => setIsAiChatOpen(!isAiChatOpen)}
@@ -624,7 +651,7 @@
             </div>
           )}
 
-          {/* Lateral del Carrito y Datos del Cliente */}
+          {/* Carrito y Checkout */}
           {isCartOpen && (
             <div className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-xs">
               <div className="bg-white w-full max-w-md h-full flex flex-col justify-between shadow-2xl p-6 overflow-y-auto">
