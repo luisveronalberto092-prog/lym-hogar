@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>L&V HOGAR - Tienda Oficial</title>
+  <title>Panel de Administración - L&V HOGAR</title>
   
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
@@ -29,14 +29,14 @@
     }
   </script>
 </head>
-<body class="antialiased transition-colors duration-300">
+<body class="bg-[#FAFAF7] text-gray-800 font-sans">
   <div id="root"></div>
 
   <script type="text/babel">
     const { useState, useEffect } = React;
 
     const SUPABASE_URL = "https://cleduaakmebcnldqeaoo.supabase.co";
-    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNsZWR1YWFrbWViY25sZHFlYW9vIwgicm9sZSI6ImFub24iLCJpYXQiOjE3OTMyMjYxMzgsImV4cCI6MjEwODgwMjEzOH0.Wl1DsflvOJLNDCaCjdNyaGe91KpCH7zpqZGJVDOpH2s";
+    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNsZWR1YWFrbWViY25sZHFlYW9vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMyMjYxMzgsImV4cCI6MjEwODgwMjEzOH0.Wl1DsflvOJLNDCaCjdNyaGe91KpCH7zpqZGJVDOpH2s";
     const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
     const DEFAULT_CONFIG = {
@@ -54,52 +54,29 @@
       secondaryColor: "#C8B297",
       bgColor: "#FAFAF7",
       headerBg: "#1C1F1D",
-      cardStyle: "rounded",
       fontFamily: "sans",
-      categories: ["Hogar", "Cuidado Personal", "Electrodomésticos", "Bazar y Cocina", "Aromas y Decoración", "Accesorios"],
-      deliveryZones: [
-        { name: "Malvinas Argentinas - 1ª Sección", price: 0 },
-        { name: "Malvinas Argentinas - 2ª Sección", price: 500 },
-        { name: "Malvinas Argentinas - 3ª Sección", price: 800 },
-        { name: "Córdoba Capital (Otras zonas)", price: 1500 }
-      ]
+      adminPassword: "admin123",
+      categories: ["Hogar", "Cuidado Personal", "Electrodomésticos", "Bazar y Cocina", "Aromas y Decoración", "Accesorios"]
     };
 
-    function CatalogApp() {
+    function AdminApp() {
+      const [isAuthenticated, setIsAuthenticated] = useState(false);
+      const [user, setUser] = useState('');
+      const [pass, setPass] = useState('');
+      const [error, setError] = useState('');
+      const [tab, setTab] = useState('products');
+
       const [config, setConfig] = useState(() => JSON.parse(localStorage.getItem('lv_config')) || DEFAULT_CONFIG);
       const [products, setProducts] = useState([]);
-      const [loadingProducts, setLoadingProducts] = useState(true);
+      const [loadingList, setLoadingList] = useState(true);
+      const [orderHistory, setOrderHistory] = useState(() => JSON.parse(localStorage.getItem('lv_order_history')) || []);
       
-      const [cart, setCart] = useState([]);
-      const [isCartOpen, setIsCartOpen] = useState(false);
-      const [searchQuery, setSearchQuery] = useState('');
-      const [selectedCategory, setSelectedCategory] = useState('Todos');
-      const [sortBy, setSortBy] = useState('default');
-      const [selectedProductModal, setSelectedProductModal] = useState(null);
-      
-      const [isAiChatOpen, setIsAiChatOpen] = useState(false);
-      const [aiMessages, setAiMessages] = useState([
-        { sender: 'bot', text: '¡Hola! Soy el asistente virtual de L&V HOGAR. Puedo ayudarte con productos, envíos a Malvinas Argentinas/Córdoba o medios de pago. ¿Qué buscas hoy?' }
-      ]);
-      const [aiInput, setAiInput] = useState('');
-      const [isAiLoading, setIsAiLoading] = useState(false);
-
-      const [fulfillmentType, setFulfillmentType] = useState('delivery');
-      const [selectedDeliveryZone, setSelectedDeliveryZone] = useState(0);
-      const [clientName, setClientName] = useState('');
-      const [clientAddress, setClientAddress] = useState('');
-      const [clientDni, setClientDni] = useState('');
-      const [preferredTime, setPreferredTime] = useState('Indistinto');
-      const [paymentMethodSelected, setPaymentMethodSelected] = useState('Efectivo contra entrega');
-      
-      const [addressError, setAddressError] = useState(false);
-      const [nameError, setNameError] = useState(false);
-      const [quantities, setQuantities] = useState({});
-      const [chosenVariant, setChosenVariant] = useState({});
-
-      const [newReviewText, setNewReviewText] = useState('');
-      const [newReviewRating, setNewReviewRating] = useState(5);
-      const [reviewSent, setReviewSent] = useState(false);
+      const [newProd, setNewProd] = useState({ 
+        title: '', price: '', stock: '10', category: 'Hogar', image: '', video: '', description: '', variants: '' 
+      });
+      const [additionalImages, setAdditionalImages] = useState([]);
+      const [savedMessage, setSavedMessage] = useState('');
+      const [isGeneratingAi, setIsGeneratingAi] = useState(false);
 
       const fetchProductsFromSupabase = async () => {
         try {
@@ -111,666 +88,398 @@
           if (error) throw error;
           setProducts(data || []);
         } catch (err) {
-          console.error("Error al obtener productos:", err);
+          console.error("Error al cargar productos:", err);
         } finally {
-          setLoadingProducts(false);
+          setLoadingList(false);
         }
       };
 
       useEffect(() => {
-        fetchProductsFromSupabase();
-        const channel = supabaseClient
-          .channel('schema-db-changes')
-          .on('postgres_changes', { event: '*', schema: 'public', table: 'productos' }, () => {
-            fetchProductsFromSupabase();
-          })
-          .subscribe();
-
-        return () => { supabaseClient.removeChannel(channel); };
-      }, []);
+        if (isAuthenticated) fetchProductsFromSupabase();
+      }, [isAuthenticated]);
 
       const primaryColor = config.brandColor || '#768C77';
-      const secondaryColor = config.secondaryColor || '#C8B297';
-      const bgColor = config.bgColor || '#FAFAF7';
-      const headerBg = config.headerBg || '#1C1F1D';
-      const fontClass = config.fontFamily === 'serif' ? 'font-serif' : config.fontFamily === 'poppins' ? 'font-poppins' : 'font-sans';
 
-      const getCategoryIcon = (cat) => {
-        const lower = cat.toLowerCase();
-        if (lower.includes('hogar')) return 'fa-house-chimney';
-        if (lower.includes('cuidado') || lower.includes('personal')) return 'fa-spa';
-        if (lower.includes('electro')) return 'fa-bolt';
-        if (lower.includes('bazar') || lower.includes('cocina')) return 'fa-utensils';
-        if (lower.includes('aroma') || lower.includes('deco')) return 'fa-wand-magic-sparkles';
-        return 'fa-box-open';
+      // Convertir archivos locales de cualquier dispositivo (celular/compu) a Base64 URL
+      const handleFileSelection = (e, type) => {
+        const files = Array.from(e.target.files);
+        if (files.length === 0) return;
+
+        if (type === 'main') {
+          const reader = new FileReader();
+          reader.onload = (uploadEvent) => {
+            setNewProd(prev => ({ ...prev, image: uploadEvent.target.result }));
+          };
+          reader.readAsDataURL(files[0]);
+        } else if (type === 'gallery') {
+          files.forEach(file => {
+            const reader = new FileReader();
+            reader.onload = (uploadEvent) => {
+              setAdditionalImages(prev => [...prev, uploadEvent.target.result]);
+            };
+            reader.readAsDataURL(file);
+          });
+        } else if (type === 'video') {
+          const reader = new FileReader();
+          reader.onload = (uploadEvent) => {
+            setNewProd(prev => ({ ...prev, video: uploadEvent.target.result }));
+          };
+          reader.readAsDataURL(files[0]);
+        }
       };
 
-      const handleSendAiMessage = async (e) => {
+      const handleSaveConfig = (e) => {
         e.preventDefault();
-        if (!aiInput.trim()) return;
+        localStorage.setItem('lv_config', JSON.stringify(config));
+        setSavedMessage('¡Configuración de diseño guardada correctamente!');
+        setTimeout(() => setSavedMessage(''), 3000);
+      };
 
-        const userText = aiInput.trim();
-        setAiMessages(prev => [...prev, { sender: 'user', text: userText }]);
-        setAiInput('');
-        setIsAiLoading(true);
+      const handleGenerateAiDescription = () => {
+        if (!newProd.title.trim()) {
+          alert('Escribí primero el nombre del producto.');
+          return;
+        }
 
+        setIsGeneratingAi(true);
         setTimeout(() => {
-          const q = userText.toLowerCase();
-          let botReply = "";
-
-          const matched = products.filter(p => 
-            p.title?.toLowerCase().includes(q) || 
-            p.description?.toLowerCase().includes(q) ||
-            p.category?.toLowerCase().includes(q)
-          );
-
-          if (q.includes('envio') || q.includes('donde') || q.includes('ubica') || q.includes('zona') || q.includes('direccion')) {
-            botReply = `📍 Nos encontramos en ${config.locationText || 'Malvinas Argentinas y Córdoba Capital'}.\n⏰ Horarios: ${config.locationHours}\n🚚 Envíos a domicilio en 1ª, 2ª y 3ª Sección de Malvinas Argentinas y Córdoba Capital.`;
-          } else if (q.includes('pago') || q.includes('alias') || q.includes('transferencia') || q.includes('tarjeta')) {
-            botReply = `💳 Medios de Pago Disponibles:\n• Efectivo contra entrega\n• Transferencia bancaria (Alias: lvhogar.mp)\n• Mercado Pago`;
-          } else if (matched.length > 0) {
-            const listStr = matched.slice(0, 3).map(p => `• *${p.title}* - $${Number(p.price).toLocaleString('es-AR')}`).join('\n');
-            botReply = `Encontré estos productos en nuestro catálogo en tiempo real:\n\n${listStr}\n\n¿Te gustaría sumar alguno al carrito?`;
-          } else {
-            botReply = `¡Gracias por tu mensaje! Contamos con amplio catálogo en artículos para el hogar y cuidado personal. Podés escribirnos directo al WhatsApp ${config.whatsappNumber} para atención personalizada.`;
-          }
-
-          setAiMessages(prev => [...prev, { sender: 'bot', text: botReply }]);
-          setIsAiLoading(false);
-        }, 500);
+          const autoDesc = `${newProd.title} de primera calidad para renovar tu hogar o rutina diaria. Diseño moderno, funcional y duradero. ¡Envíos locales rápidos en Malvinas Argentinas y Córdoba Capital!`;
+          setNewProd(prev => ({ ...prev, description: autoDesc }));
+          setIsGeneratingAi(false);
+        }, 600);
       };
 
-      const handleQtyChange = (productId, delta) => {
-        setQuantities(prev => {
-          const current = prev[productId] || 1;
-          const updated = current + delta;
-          return { ...prev, [productId]: updated > 0 ? updated : 1 };
-        });
-      };
-
-      const addToCart = (product) => {
-        const qtyToAdd = quantities[product.id] || 1;
-        let variantString = "";
-        if (product.variants && product.variants.trim()) {
-          const optionsArray = product.variants.split(',').map(v => v.trim());
-          variantString = chosenVariant[product.id] || optionsArray[0];
-        }
-
-        const cartItemId = variantString ? `${product.id}-${variantString}` : product.id;
-
-        setCart(prev => {
-          const exists = prev.find(item => item.cartItemId === cartItemId);
-          if (exists) {
-            return prev.map(item => item.cartItemId === cartItemId ? { ...item, qty: item.qty + qtyToAdd } : item);
-          }
-          return [...prev, { ...product, cartItemId, qty: qtyToAdd, selectedVariant: variantString }];
-        });
-        setIsCartOpen(true);
-      };
-
-      const updateQty = (cartItemId, delta) => {
-        setCart(prev => prev.map(item => {
-          if (item.cartItemId === cartItemId) {
-            const newQty = item.qty + delta;
-            return newQty > 0 ? { ...item, qty: newQty } : item;
-          }
-          return item;
-        }));
-      };
-
-      const removeFromCart = (cartItemId) => setCart(prev => prev.filter(item => item.cartItemId !== cartItemId));
-
-      const getSubtotal = () => cart.reduce((sum, item) => sum + (Number(item.price) * item.qty), 0);
-      const getDeliveryCost = () => {
-        if (fulfillmentType === 'pickup') return 0;
-        return config.deliveryZones ? config.deliveryZones[selectedDeliveryZone].price : 0;
-      };
-      const getTotal = () => getSubtotal() + getDeliveryCost();
-
-      const generateOrderText = () => {
-        let message = config.whatsappMsg || "¡Hola L&V HOGAR! Quisiera realizar el siguiente pedido:\n\n";
-        
-        if (clientName.trim()) message += `👤 *Cliente:* ${clientName.trim()}\n`;
-        
-        message += `🛒 *PRODUCTOS:*\n`;
-        cart.forEach(item => {
-          const varText = item.selectedVariant ? ` [${item.selectedVariant}]` : '';
-          message += `• ${item.title}${varText} x${item.qty} - $${(Number(item.price) * item.qty).toLocaleString('es-AR')}\n`;
-        });
-
-        message += `\n💵 *Subtotal:* $${getSubtotal().toLocaleString('es-AR')}`;
-
-        if (fulfillmentType === 'delivery') {
-          const zone = config.deliveryZones ? config.deliveryZones[selectedDeliveryZone] : { name: "Estándar", price: 0 };
-          message += `\n🚚 *Entrega:* Envío a Domicilio (${zone.name} - $${zone.price.toLocaleString('es-AR')})`;
-          message += `\n📍 *Dirección:* ${clientAddress.trim()}`;
+      const handleLogin = (e) => {
+        e.preventDefault();
+        const validPass = config.adminPassword || 'admin123';
+        if (user === 'admin' && pass === validPass) {
+          setIsAuthenticated(true);
         } else {
-          message += `\n🏪 *Entrega:* Retiro en Punto / Local`;
+          setError('Usuario o contraseña incorrectos');
         }
-
-        if (clientDni.trim()) message += `\n🆔 *DNI:* ${clientDni.trim()}`;
-        message += `\n⏰ *Horario Preferido:* ${preferredTime}`;
-        message += `\n💳 *Medio de Pago:* ${paymentMethodSelected}`;
-        message += `\n\n💰 *TOTAL FINAL:* $${getTotal().toLocaleString('es-AR')}\n\n¿Me confirman la recepción del pedido?`;
-        return message;
       };
 
-      const handleCheckoutWhatsApp = () => {
-        if (cart.length === 0) return;
-        if (!clientName.trim()) { setNameError(true); return; } else setNameError(false);
-        if (fulfillmentType === 'delivery' && !clientAddress.trim()) { setAddressError(true); return; } else setAddressError(false);
-
-        const currentHistory = JSON.parse(localStorage.getItem('lv_order_history')) || [];
-        const newOrder = {
-          id: Date.now(),
-          date: new Date().toLocaleString('es-AR'),
-          items: cart,
-          total: getTotal(),
-          status: 'Enviado por WhatsApp'
-        };
-        localStorage.setItem('lv_order_history', JSON.stringify([newOrder, ...currentHistory]));
-
-        window.open(`https://wa.me/${config.whatsappNumber}?text=${encodeURIComponent(generateOrderText())}`, '_blank');
-      };
-
-      const handleAddReview = async () => {
-        if (!selectedProductModal) return;
+      const handleAddProduct = async (e) => {
+        e.preventDefault();
         try {
-          const currentRating = Number(selectedProductModal.rating || 5);
-          const currentCount = Number(selectedProductModal.reviews_count || 1);
-          
-          const newCount = currentCount + 1;
-          const newAvg = ((currentRating * currentCount) + newReviewRating) / newCount;
+          const payload = {
+            title: newProd.title.trim(),
+            price: parseFloat(newProd.price),
+            category: newProd.category,
+            stock: parseInt(newProd.stock),
+            image: newProd.image.trim() || 'https://images.unsplash.com/photo-1583847268964-b28dc8f51f92?auto=format&fit=crop&w=600&q=80',
+            video: newProd.video.trim(),
+            gallery: additionalImages,
+            description: newProd.description.trim(),
+            variants: newProd.variants.trim()
+          };
 
-          await supabaseClient
-            .from('productos')
-            .update({ rating: newAvg.toFixed(1), reviews_count: newCount })
-            .eq('id', selectedProductModal.id);
+          const { error } = await supabaseClient.from('productos').insert([payload]);
+          if (error) throw error;
 
-          setReviewSent(true);
-          setTimeout(() => { setReviewSent(false); setNewReviewText(''); }, 3000);
+          setNewProd({ title: '', price: '', stock: '10', category: config.categories?.[0] || 'Hogar', image: '', video: '', description: '', variants: '' });
+          setAdditionalImages([]);
+          setSavedMessage('¡Producto con múltiples fotos guardado con éxito en Supabase!');
+          fetchProductsFromSupabase();
+          setTimeout(() => setSavedMessage(''), 3000);
+        } catch (err) {
+          alert('Error al guardar el producto: ' + err.message);
+        }
+      };
+
+      const handleDeleteProduct = async (id) => {
+        if (!confirm('¿Seguro que querés eliminar este producto?')) return;
+        try {
+          const { error } = await supabaseClient.from('productos').delete().eq('id', id);
+          if (error) throw error;
           fetchProductsFromSupabase();
         } catch (err) {
-          console.error("Error al enviar reseña:", err);
+          alert('Error al eliminar: ' + err.message);
         }
       };
 
-      const categories = ['Todos', ...(config.categories || ["Hogar", "Cuidado Personal", "Electrodomésticos"])];
-      const filteredProducts = products.filter(p => {
-        const matchesCat = selectedCategory === 'Todos' || p.category === selectedCategory;
-        const matchesSearch = p.title?.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                              p.description?.toLowerCase().includes(searchQuery.toLowerCase());
-        return matchesCat && matchesSearch;
-      }).sort((a, b) => {
-        if (sortBy === 'low-high') return Number(a.price) - Number(b.price);
-        if (sortBy === 'high-low') return Number(b.price) - Number(a.price);
-        return 0;
-      });
-
-      return (
-        <div style={{ backgroundColor: bgColor }} className={`min-h-screen flex flex-col text-gray-800 ${fontClass}`}>
-          <div style={{ backgroundColor: primaryColor }} className="text-white text-[11px] py-1.5 px-4 text-center tracking-wide font-light flex justify-center items-center gap-4 flex-wrap">
-            <span><i className="fa-solid fa-location-dot mr-1"></i> {config.locationText || "Malvinas Argentinas y Córdoba Capital"}</span>
-            <span className="hidden sm:inline">|</span>
-            <span><i className="fa-solid fa-clock mr-1"></i> {config.locationHours || "Lun a Sáb: 9 a 20hs"}</span>
-          </div>
-
-          <header style={{ backgroundColor: headerBg }} className="text-white shadow-md sticky top-0 z-40 border-b border-white/10">
-            <div className="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
-              <div className="flex items-center space-x-3">
-                <div style={{ borderColor: secondaryColor }} className="w-11 h-11 border rounded-full flex flex-col items-center justify-center bg-black/40 shadow">
-                  <span style={{ color: primaryColor }} className="font-serif font-bold text-sm tracking-widest leading-none">L&V</span>
-                  <span style={{ color: secondaryColor }} className="font-serif text-[7px] tracking-tighter uppercase">HOGAR</span>
+      if (!isAuthenticated) {
+        return (
+          <div className="min-h-screen flex items-center justify-center p-4 bg-gray-100">
+            <div className="bg-white p-8 rounded-2xl shadow-lg border border-gray-200 w-full max-w-sm space-y-4">
+              <div className="text-center mb-4">
+                <div className="w-12 h-12 border rounded-full flex flex-col items-center justify-center mx-auto mb-2 bg-[#1C1F1D]">
+                  <span className="font-serif font-bold text-[#768C77] text-sm">L&V</span>
                 </div>
-                <div>
-                  <h1 className="text-lg md:text-xl font-serif tracking-widest text-white">{config.storeName}</h1>
-                  <p className="text-[10px] tracking-wide uppercase hidden sm:block" style={{ color: secondaryColor }}>{config.storeSubtitle}</p>
-                </div>
+                <h2 className="text-xl font-serif text-gray-800">Panel Privado</h2>
+                <p className="text-xs text-gray-500">L&V HOGAR Administración</p>
               </div>
 
-              <button 
-                onClick={() => setIsCartOpen(true)}
-                style={{ backgroundColor: primaryColor }}
-                className="text-white px-4 py-2 rounded-full flex items-center space-x-2 transition shadow text-xs font-medium border border-white/20 hover:opacity-90"
-              >
-                <i className="fa-solid fa-bag-shopping text-sm"></i>
-                <span className="hidden sm:inline">Mi Carrito</span>
-                <span style={{ backgroundColor: secondaryColor }} className="text-black text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center">
-                  {cart.reduce((s, i) => s + i.qty, 0)}
-                </span>
-              </button>
+              <form onSubmit={handleLogin} className="space-y-3">
+                {error && <p className="text-xs text-red-500 text-center bg-red-50 p-2 rounded">{error}</p>}
+                <div>
+                  <label className="block text-xs font-semibold mb-1">Usuario</label>
+                  <input type="text" value={user} onChange={e=>setUser(e.target.value)} className="w-full p-2.5 border rounded-xl text-xs bg-gray-50" required />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold mb-1">Contraseña</label>
+                  <input type="password" value={pass} onChange={e=>setPass(e.target.value)} className="w-full p-2.5 border rounded-xl text-xs bg-gray-50" required />
+                </div>
+                <button type="submit" style={{ backgroundColor: primaryColor }} className="w-full text-white py-2.5 rounded-xl text-xs font-medium shadow">Ingresar</button>
+              </form>
+              <a href="index.html" className="block text-center text-xs text-gray-400 hover:underline pt-2">Volver a la tienda</a>
+            </div>
+          </div>
+        );
+      }
+
+      return (
+        <div className="min-h-screen flex flex-col">
+          <header className="bg-[#1C1F1D] text-white p-4 flex justify-between items-center text-xs border-b border-white/10">
+            <div className="flex items-center space-x-2">
+              <span className="font-serif font-bold text-[#C8B297] text-sm">L&V HOGAR</span>
+              <span className="text-gray-400">| Control Total de la Web</span>
+            </div>
+            <div className="flex gap-4">
+              <a href="index.html" target="_blank" className="text-[#C8B297] hover:underline flex items-center gap-1">Ver Tienda <i className="fa-solid fa-external-link text-[10px]"></i></a>
+              <button onClick={() => setIsAuthenticated(false)} className="text-red-400 hover:underline">Cerrar Sesión</button>
             </div>
           </header>
 
-          {config.showBanner && (
-            <section style={{ backgroundColor: headerBg }} className="text-white py-8 px-4 text-center border-b border-white/10">
-              <div className="max-w-3xl mx-auto">
-                <span style={{ backgroundColor: secondaryColor + '30', color: secondaryColor }} className="text-[10px] font-semibold uppercase tracking-widest px-4 py-1 rounded-full border border-white/20">
-                  CATÁLOGO ONLINE OFICIAL
-                </span>
-                <h2 className="text-2xl md:text-3xl font-serif text-white mt-3">{config.bannerTitle}</h2>
-                <p className="mt-2 text-gray-300 text-xs md:text-sm font-light">{config.bannerText}</p>
-              </div>
-            </section>
-          )}
-
-          <main className="max-w-7xl mx-auto px-4 py-8 flex-grow w-full">
-            
-            {/* NUEVA BARRA DE CATEGORÍAS MODERNA TIPO TARJETAS CON ICONOS */}
-            <div className="mb-8">
-              <div className="flex justify-between items-center mb-3">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500">Explorar por Categoría</h3>
-                {selectedCategory !== 'Todos' && (
-                  <button onClick={() => setSelectedCategory('Todos')} className="text-xs text-[#768C77] font-semibold hover:underline">
-                    Ver todos
-                  </button>
-                )}
-              </div>
-
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-3">
-                {categories.map(cat => {
-                  const isSelected = selectedCategory === cat;
-                  const iconName = cat === 'Todos' ? 'fa-border-all' : getCategoryIcon(cat);
-
-                  return (
-                    <button
-                      key={cat}
-                      onClick={() => setSelectedCategory(cat)}
-                      style={isSelected ? { backgroundColor: primaryColor, borderColor: primaryColor } : {}}
-                      className={`p-3.5 rounded-2xl border text-left transition flex flex-col justify-between items-start group shadow-xs ${
-                        isSelected 
-                          ? 'text-white shadow-md transform -translate-y-0.5' 
-                          : 'bg-white border-gray-200 text-gray-700 hover:border-gray-400 hover:bg-gray-50'
-                      }`}
-                    >
-                      <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-xs transition ${
-                        isSelected ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600 group-hover:bg-gray-200'
-                      }`}>
-                        <i className={`fa-solid ${iconName}`}></i>
-                      </div>
-                      <span className="font-semibold text-xs tracking-tight mt-3 line-clamp-1">{cat}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Barra de Búsqueda y Ordenar */}
-            <div className="flex justify-end items-center mb-8 gap-3">
-              <select 
-                value={sortBy} 
-                onChange={(e) => setSortBy(e.target.value)}
-                className="bg-white border border-gray-200 rounded-full px-4 py-2.5 text-xs text-gray-700 focus:outline-none shadow-xs"
-              >
-                <option value="default">Destacados</option>
-                <option value="low-high">Precio: Menor a Mayor</option>
-                <option value="high-low">Precio: Mayor a Menor</option>
-              </select>
-
-              <div className="relative w-full sm:w-72">
-                <i style={{ color: primaryColor }} className="fa-solid fa-magnifying-glass absolute left-4 top-3 text-xs"></i>
-                <input
-                  type="text"
-                  placeholder="Buscar producto..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-full text-xs focus:outline-none shadow-xs"
-                />
-              </div>
-            </div>
-
-            {/* Grilla de Productos */}
-            {loadingProducts ? (
-              <div className="text-center py-20 text-gray-500">
-                <i className="fa-solid fa-spinner animate-spin text-2xl mb-2"></i>
-                <p>Cargando productos en tiempo real...</p>
-              </div>
-            ) : filteredProducts.length === 0 ? (
-              <div className="text-center py-20 text-gray-400">No se encontraron productos en esta categoría.</div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                {filteredProducts.map(product => {
-                  const isAvailable = Number(product.stock) > 0;
-                  const currentQty = quantities[product.id] || 1;
-                  const hasVariants = product.variants && product.variants.trim().length > 0;
-                  const variantsList = hasVariants ? product.variants.split(',').map(v => v.trim()) : [];
-                  const activeVariant = chosenVariant[product.id] || (variantsList.length > 0 ? variantsList[0] : '');
-
-                  return (
-                    <div key={product.id} className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden flex flex-col justify-between hover:shadow-md transition">
-                      <div>
-                        <div className="relative h-52 bg-gray-100 overflow-hidden cursor-pointer group" onClick={() => setSelectedProductModal(product)}>
-                          <img src={product.image || 'https://images.unsplash.com/photo-1583847268964-b28dc8f51f92?auto=format&fit=crop&w=600&q=80'} alt={product.title} className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
-                          
-                          {product.video && (
-                            <span style={{ backgroundColor: primaryColor }} className="absolute bottom-3 left-3 text-white text-[10px] font-bold px-2.5 py-1 rounded-lg flex items-center gap-1 shadow">
-                              <i className="fa-solid fa-play"></i> Video Demostrativo
-                            </span>
-                          )}
-
-                          <span className={`absolute top-3 right-3 text-[10px] font-semibold px-2.5 py-0.5 rounded-full shadow ${
-                            isAvailable ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'
-                          }`}>
-                            {isAvailable ? 'Disponible' : 'Agotado'}
-                          </span>
-                        </div>
-
-                        <div className="p-5">
-                          <div className="flex justify-between items-center">
-                            <span style={{ color: primaryColor }} className="text-[10px] font-semibold uppercase tracking-widest">{product.category}</span>
-                            <div className="flex items-center gap-1 text-amber-400 text-xs font-bold">
-                              <i className="fa-solid fa-star"></i>
-                              <span className="text-gray-600 text-[11px]">{product.rating || '5.0'}</span>
-                            </div>
-                          </div>
-                          <h3 className="font-serif text-base text-gray-800 mt-1 cursor-pointer hover:opacity-80 transition" onClick={() => setSelectedProductModal(product)}>
-                            {product.title}
-                          </h3>
-                          <p className="text-gray-500 text-xs mt-2 font-light line-clamp-2">{product.description}</p>
-                        </div>
-                      </div>
-
-                      <div className="p-5 pt-0 space-y-3">
-                        <div className="flex justify-between items-center">
-                          <span style={{ color: primaryColor }} className="text-lg font-serif font-bold">${Number(product.price).toLocaleString('es-AR')}</span>
-                          <button onClick={() => setSelectedProductModal(product)} className="text-xs text-gray-500 hover:underline">Ver detalle</button>
-                        </div>
-
-                        {hasVariants && (
-                          <div className="space-y-1">
-                            <label className="block text-[11px] font-semibold text-gray-700">Opción:</label>
-                            <select 
-                              value={activeVariant}
-                              onChange={(e) => setChosenVariant(prev => ({ ...prev, [product.id]: e.target.value }))}
-                              className="w-full p-2 bg-gray-100 border border-gray-200 rounded-xl text-xs text-gray-700"
-                            >
-                              {variantsList.map((v, idx) => (<option key={idx} value={v}>{v}</option>))}
-                            </select>
-                          </div>
-                        )}
-
-                        {isAvailable ? (
-                          <div className="flex items-center justify-between bg-gray-100 p-1 rounded-xl border border-gray-200">
-                            <div className="flex items-center gap-2 px-2">
-                              <button onClick={() => handleQtyChange(product.id, -1)} className="w-6 h-6 bg-white rounded font-bold text-gray-600 shadow-xs">-</button>
-                              <span className="text-xs font-bold w-4 text-center">{currentQty}</span>
-                              <button onClick={() => handleQtyChange(product.id, 1)} className="w-6 h-6 bg-white rounded font-bold text-gray-600 shadow-xs">+</button>
-                            </div>
-                            <button onClick={() => addToCart(product)} style={{ backgroundColor: primaryColor }} className="text-white px-3 py-1.5 rounded-lg font-medium text-xs shadow-xs hover:opacity-90">
-                              Agregar
-                            </button>
-                          </div>
-                        ) : (
-                          <button disabled className="w-full bg-gray-200 text-gray-400 font-medium text-xs py-2 rounded-xl cursor-not-allowed">Agotado</button>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
+          <main className="max-w-6xl mx-auto p-6 w-full flex-grow">
+            {savedMessage && (
+              <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-xl flex items-center gap-2">
+                <i className="fa-solid fa-check-circle text-base"></i> {savedMessage}
               </div>
             )}
-          </main>
 
-          {/* Modal de Detalle + Video + Reseñas */}
-          {selectedProductModal && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
-              <div className="bg-white rounded-2xl max-w-lg w-full overflow-hidden shadow-2xl border border-gray-200 max-h-[90vh] overflow-y-auto">
-                {selectedProductModal.video ? (
-                  <div className="relative bg-black h-64">
-                    <video src={selectedProductModal.video} controls autoPlay className="w-full h-full object-contain"></video>
-                    <button onClick={() => setSelectedProductModal(null)} className="absolute top-3 right-3 bg-black/60 text-white w-8 h-8 rounded-full flex items-center justify-center">
-                      <i className="fa-solid fa-xmark"></i>
-                    </button>
-                  </div>
-                ) : (
-                  <div className="relative h-64 bg-gray-100">
-                    <img src={selectedProductModal.image} alt={selectedProductModal.title} className="w-full h-full object-cover" />
-                    <button onClick={() => setSelectedProductModal(null)} className="absolute top-3 right-3 bg-black/60 text-white w-8 h-8 rounded-full flex items-center justify-center">
-                      <i className="fa-solid fa-xmark"></i>
-                    </button>
-                  </div>
-                )}
-
-                <div className="p-6 space-y-4">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <span style={{ color: primaryColor }} className="text-[10px] font-semibold uppercase tracking-widest">{selectedProductModal.category}</span>
-                      <h3 className="text-xl font-serif font-bold text-gray-800">{selectedProductModal.title}</h3>
-                    </div>
-                    <span style={{ color: primaryColor }} className="text-2xl font-serif font-bold">${Number(selectedProductModal.price).toLocaleString('es-AR')}</span>
-                  </div>
-
-                  <p className="text-xs text-gray-600 leading-relaxed font-light">{selectedProductModal.description}</p>
-                  
-                  <div className="border-t pt-4 space-y-3">
-                    <h4 className="font-serif font-bold text-xs text-gray-800">Calificaciones y Reseñas de Clientes</h4>
-                    <div className="flex items-center gap-2">
-                      <div className="flex text-amber-400 text-sm">
-                        {[1, 2, 3, 4, 5].map(star => (
-                          <i key={star} className={`fa-solid fa-star ${star <= Math.round(selectedProductModal.rating || 5) ? 'text-amber-400' : 'text-gray-200'}`}></i>
-                        ))}
-                      </div>
-                      <span className="text-xs font-bold text-gray-700">{selectedProductModal.rating || '5.0'} / 5</span>
-                      <span className="text-xs text-gray-400">({selectedProductModal.reviews_count || 1} opiniones)</span>
-                    </div>
-
-                    <div className="bg-gray-50 p-3 rounded-xl border space-y-2 text-xs">
-                      <p className="font-medium text-gray-700">Dejá tu opinión sobre este producto:</p>
-                      <div className="flex gap-1 text-amber-400 text-lg">
-                        {[1, 2, 3, 4, 5].map(star => (
-                          <i 
-                            key={star} 
-                            onClick={() => setNewReviewRating(star)} 
-                            className={`fa-solid fa-star cursor-pointer ${star <= newReviewRating ? 'text-amber-400' : 'text-gray-300'}`}
-                          ></i>
-                        ))}
-                      </div>
-                      <textarea 
-                        placeholder="Escribí un comentario breve..." 
-                        value={newReviewText}
-                        onChange={e => setNewReviewText(e.target.value)}
-                        className="w-full p-2 border rounded-lg text-xs bg-white"
-                      ></textarea>
-                      <button 
-                        onClick={handleAddReview}
-                        style={{ backgroundColor: primaryColor }}
-                        className="text-white px-3 py-1.5 rounded-lg font-medium text-xs shadow-xs"
-                      >
-                        Enviar Calificación
-                      </button>
-                      {reviewSent && <p className="text-emerald-600 text-[11px] font-bold">¡Gracias por calificar el producto!</p>}
-                    </div>
-                  </div>
-
-                  <div className="border-t pt-4 flex gap-3">
-                    <button onClick={() => { addToCart(selectedProductModal); setSelectedProductModal(null); }} style={{ backgroundColor: primaryColor }} className="w-full text-white text-xs font-medium py-3 rounded-xl flex items-center justify-center gap-2 shadow">
-                      <i className="fa-solid fa-bag-shopping"></i> Agregar al Carrito
-                    </button>
-                  </div>
-                </div>
-              </div>
+            <div className="flex gap-2 border-b mb-6 text-xs font-medium">
+              <button onClick={() => setTab('products')} className={`pb-2 px-4 ${tab === 'products' ? 'border-b-2 border-[#768C77] text-[#768C77] font-bold' : 'text-gray-500'}`}>
+                📦 Productos y Archivos Multidial
+              </button>
+              <button onClick={() => setTab('design')} className={`pb-2 px-4 ${tab === 'design' ? 'border-b-2 border-[#768C77] text-[#768C77] font-bold' : 'text-gray-500'}`}>
+                🎨 Diseño y Ubicación
+              </button>
+              <button onClick={() => setTab('history')} className={`pb-2 px-4 ${tab === 'history' ? 'border-b-2 border-[#768C77] text-[#768C77] font-bold' : 'text-gray-500'}`}>
+                📜 Historial de Pedidos
+              </button>
             </div>
-          )}
 
-          {/* Botones Flotantes */}
-          <div className="fixed bottom-6 right-6 flex flex-col gap-3 z-40">
-            <button 
-              onClick={() => setIsAiChatOpen(!isAiChatOpen)}
-              style={{ backgroundColor: secondaryColor }}
-              className="text-black w-14 h-14 rounded-full flex items-center justify-center shadow-2xl border-2 border-white"
-              title="Asistente Virtual IA"
-            >
-              <i className="fa-solid fa-robot text-2xl"></i>
-            </button>
-            <a href={`https://wa.me/${config.whatsappNumber}`} target="_blank" rel="noopener noreferrer" style={{ backgroundColor: primaryColor }} className="text-white w-14 h-14 rounded-full flex items-center justify-center shadow-2xl border-2 border-white">
-              <i className="fa-brands fa-whatsapp text-3xl"></i>
-            </a>
-          </div>
-
-          {/* Chat Asistente IA */}
-          {isAiChatOpen && (
-            <div className="fixed bottom-24 right-6 w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-gray-200 z-50 overflow-hidden flex flex-col h-96">
-              <div style={{ backgroundColor: headerBg }} className="p-3 text-white flex justify-between items-center border-b border-white/10">
-                <div className="flex items-center gap-2">
-                  <i style={{ color: secondaryColor }} className="fa-solid fa-robot text-lg"></i>
-                  <div>
-                    <h4 className="text-xs font-bold">Asistente L&V HOGAR</h4>
-                    <p className="text-[9px] text-gray-300">Responde sobre envíos y productos</p>
-                  </div>
-                </div>
-                <button onClick={() => setIsAiChatOpen(false)} className="text-gray-400 hover:text-white">
-                  <i className="fa-solid fa-xmark text-sm"></i>
-                </button>
-              </div>
-
-              <div className="p-3 flex-grow overflow-y-auto space-y-2 text-xs bg-gray-50">
-                {aiMessages.map((msg, idx) => (
-                  <div key={idx} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
-                    <div className={`p-2.5 rounded-xl max-w-[80%] whitespace-pre-line ${
-                      msg.sender === 'user' ? 'bg-[#768C77] text-white' : 'bg-white border text-gray-800 shadow-xs'
-                    }`}>
-                      {msg.text}
-                    </div>
-                  </div>
-                ))}
-                {isAiLoading && <div className="text-gray-400 text-xs p-2">Escribiendo...</div>}
-              </div>
-
-              <form onSubmit={handleSendAiMessage} className="p-2 bg-white border-t flex gap-1">
-                <input 
-                  type="text" 
-                  placeholder="Preguntá por productos, pagos o envíos..." 
-                  value={aiInput} 
-                  onChange={e => setAiInput(e.target.value)} 
-                  className="flex-grow p-2 border rounded-xl text-xs bg-gray-50 focus:outline-none"
-                />
-                <button type="submit" style={{ backgroundColor: primaryColor }} className="text-white px-3 py-2 rounded-xl text-xs">
-                  <i className="fa-solid fa-paper-plane"></i>
-                </button>
-              </form>
-            </div>
-          )}
-
-          {/* Carrito y Checkout */}
-          {isCartOpen && (
-            <div className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-xs">
-              <div className="bg-white w-full max-w-md h-full flex flex-col justify-between shadow-2xl p-6 overflow-y-auto">
-                <div>
-                  <div className="flex justify-between items-center pb-4 border-b">
-                    <h3 className="font-serif text-lg text-gray-800 flex items-center gap-2">
-                      <i style={{ color: primaryColor }} className="fa-solid fa-bag-shopping"></i> Tu Pedido
-                    </h3>
-                    <button onClick={() => setIsCartOpen(false)} className="text-gray-400 hover:text-gray-600">
-                      <i className="fa-solid fa-xmark text-lg"></i>
-                    </button>
-                  </div>
-
-                  {cart.length === 0 ? (
-                    <div className="text-center py-12 text-gray-400">Tu carrito está vacío.</div>
-                  ) : (
-                    <div className="divide-y my-4 max-h-40 overflow-y-auto pr-1">
-                      {cart.map(item => (
-                        <div key={item.cartItemId} className="py-3 flex items-center justify-between text-xs">
-                          <div className="flex items-center gap-3">
-                            <img src={item.image} alt={item.title} className="w-12 h-12 object-cover rounded-xl border" />
-                            <div>
-                              <p className="font-serif font-bold text-gray-800">{item.title}</p>
-                              {item.selectedVariant && <p className="text-[10px] text-gray-500">Opción: {item.selectedVariant}</p>}
-                              <p className="text-gray-500">${Number(item.price).toLocaleString('es-AR')}</p>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <button onClick={() => updateQty(item.cartItemId, -1)} className="bg-gray-100 px-2 py-0.5 rounded font-bold">-</button>
-                            <span className="font-bold">{item.qty}</span>
-                            <button onClick={() => updateQty(item.cartItemId, 1)} className="bg-gray-100 px-2 py-0.5 rounded font-bold">+</button>
-                            <button onClick={() => removeFromCart(item.cartItemId)} className="text-red-400 hover:text-red-600 ml-1"><i className="fa-solid fa-trash-can"></i></button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {cart.length > 0 && (
-                  <div className="border-t pt-3 space-y-2.5 text-xs">
+            {tab === 'products' && (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                
+                {/* Formulario Carga de Producto con Múltiples Archivos */}
+                <div className="bg-white p-5 rounded-2xl shadow-sm border space-y-3 text-xs">
+                  <h3 className="font-serif font-bold text-sm">Cargar Producto (Fotos y Video)</h3>
+                  <form onSubmit={handleAddProduct} className="space-y-3">
                     <div>
-                      <label className="block font-semibold text-gray-700 mb-1">Nombre y Apellido: <span className="text-red-500">*</span></label>
-                      <input type="text" placeholder="Tu nombre completo..." value={clientName} onChange={(e) => { setClientName(e.target.value); setNameError(false); }} className={`w-full p-2 border rounded-xl bg-gray-100 ${nameError ? 'border-red-500' : 'border-gray-200'}`} />
+                      <label className="block font-medium mb-1">Nombre del Producto</label>
+                      <input type="text" value={newProd.title} onChange={e=>setNewProd({...newProd, title: e.target.value})} className="w-full p-2 border rounded-xl bg-gray-50" required />
                     </div>
-
-                    <div>
-                      <label className="block font-semibold text-gray-700 mb-1">Método de Entrega:</label>
-                      <div className="grid grid-cols-2 gap-2">
-                        <button type="button" onClick={() => setFulfillmentType('delivery')} className={`p-2 rounded-xl border text-[11px] font-medium transition ${fulfillmentType === 'delivery' ? 'bg-gray-100 border-gray-400 font-bold' : 'border-gray-200'}`}>🚚 Envío a Domicilio</button>
-                        <button type="button" onClick={() => setFulfillmentType('pickup')} className={`p-2 rounded-xl border text-[11px] font-medium transition ${fulfillmentType === 'pickup' ? 'bg-gray-100 border-gray-400 font-bold' : 'border-gray-200'}`}>🏪 Retiro en Punto</button>
-                      </div>
-                    </div>
-
-                    {fulfillmentType === 'delivery' && (
-                      <>
-                        <div>
-                          <label className="block font-semibold text-gray-700 mb-1">Zona de Envío:</label>
-                          <select value={selectedDeliveryZone} onChange={(e) => setSelectedDeliveryZone(Number(e.target.value))} className="w-full p-2 border rounded-xl bg-gray-100">
-                            {config.deliveryZones && config.deliveryZones.map((zone, idx) => (
-                              <option key={idx} value={idx}>{zone.name} - ${zone.price.toLocaleString('es-AR')}</option>
-                            ))}
-                          </select>
-                        </div>
-                        <div>
-                          <label className="block font-semibold text-gray-700 mb-1">Dirección de Entrega: <span className="text-red-500">*</span></label>
-                          <input type="text" placeholder="Calle, Número, Barrio..." value={clientAddress} onChange={(e) => { setClientAddress(e.target.value); setAddressError(false); }} className={`w-full p-2 border rounded-xl bg-gray-100 ${addressError ? 'border-red-500' : 'border-gray-200'}`} />
-                        </div>
-                      </>
-                    )}
 
                     <div className="grid grid-cols-2 gap-2">
                       <div>
-                        <label className="block font-semibold text-gray-700 mb-1">DNI (Opcional):</label>
-                        <input type="text" placeholder="Ej: 35123456" value={clientDni} onChange={(e) => setClientDni(e.target.value)} className="w-full p-2 border rounded-xl bg-gray-100" />
-                      </div>
-                      <div>
-                        <label className="block font-semibold text-gray-700 mb-1">Horario Preferido:</label>
-                        <select value={preferredTime} onChange={(e) => setPreferredTime(e.target.value)} className="w-full p-2 border rounded-xl bg-gray-100">
-                          <option value="Indistinto">Indistinto</option>
-                          <option value="Mañana (9hs a 13hs)">Mañana (9hs a 13hs)</option>
-                          <option value="Tarde (14hs a 18hs)">Tarde (14hs a 18hs)</option>
+                        <label className="block font-medium mb-1">Categoría</label>
+                        <select value={newProd.category} onChange={e=>setNewProd({...newProd, category: e.target.value})} className="w-full p-2 border rounded-xl bg-gray-50">
+                          {(config.categories || []).map(c=>(<option key={c} value={c}>{c}</option>))}
                         </select>
                       </div>
+                      <div>
+                        <label className="block font-medium mb-1">Precio ($)</label>
+                        <input type="number" value={newProd.price} onChange={e=>setNewProd({...newProd, price: e.target.value})} className="w-full p-2 border rounded-xl font-bold bg-gray-50" required />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block font-medium mb-1">Stock</label>
+                        <input type="number" value={newProd.stock} onChange={e=>setNewProd({...newProd, stock: e.target.value})} className="w-full p-2 border rounded-xl bg-gray-50" required />
+                      </div>
+                      <div>
+                        <label className="block font-medium mb-1">Variantes (opcional)</label>
+                        <input type="text" placeholder="Rojo, Azul, Talle S" value={newProd.variants} onChange={e=>setNewProd({...newProd, variants: e.target.value})} className="w-full p-2 border rounded-xl bg-gray-50" />
+                      </div>
+                    </div>
+
+                    {/* Foto Principal con Selector de Archivos (Celular / PC) */}
+                    <div className="bg-gray-50 p-2.5 rounded-xl border space-y-1">
+                      <label className="block font-medium text-gray-700">📸 Foto Principal (Desde Dispositivo o URL):</label>
+                      <input 
+                        type="file" 
+                        accept="image/*" 
+                        onChange={(e) => handleFileSelection(e, 'main')} 
+                        className="w-full text-[11px] text-gray-500 file:mr-2 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-[#768C77] file:text-white hover:file:opacity-90"
+                      />
+                      <input type="text" placeholder="O pegá URL https://..." value={newProd.image} onChange={e=>setNewProd({...newProd, image: e.target.value})} className="w-full p-1.5 border rounded-lg bg-white mt-1" />
+                      {newProd.image && <img src={newProd.image} className="w-16 h-16 object-cover rounded-lg mt-1 border" />}
+                    </div>
+
+                    {/* Múltiples Fotos / Galería */}
+                    <div className="bg-gray-50 p-2.5 rounded-xl border space-y-1">
+                      <label className="block font-medium text-gray-700">🖼️ Fotos Secundarias (Galería múltiple):</label>
+                      <input 
+                        type="file" 
+                        accept="image/*" 
+                        multiple
+                        onChange={(e) => handleFileSelection(e, 'gallery')} 
+                        className="w-full text-[11px] text-gray-500 file:mr-2 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-gray-700 file:text-white hover:file:opacity-90"
+                      />
+                      {additionalImages.length > 0 && (
+                        <div className="flex gap-1.5 mt-2 overflow-x-auto pb-1">
+                          {additionalImages.map((img, idx) => (
+                            <div key={idx} className="relative">
+                              <img src={img} className="w-12 h-12 object-cover rounded-lg border" />
+                              <button type="button" onClick={() => setAdditionalImages(additionalImages.filter((_, i) => i !== idx))} className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 text-[9px] flex items-center justify-center">×</button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Video Demostrativo */}
+                    <div className="bg-gray-50 p-2.5 rounded-xl border space-y-1">
+                      <label className="block font-medium text-gray-700">🎬 Video Demostrativo (MP4):</label>
+                      <input 
+                        type="file" 
+                        accept="video/mp4,video/*" 
+                        onChange={(e) => handleFileSelection(e, 'video')} 
+                        className="w-full text-[11px] text-gray-500 file:mr-2 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-amber-700 file:text-white hover:file:opacity-90"
+                      />
+                      <input type="text" placeholder="O pegá URL del video..." value={newProd.video} onChange={e=>setNewProd({...newProd, video: e.target.value})} className="w-full p-1.5 border rounded-lg bg-white mt-1" />
                     </div>
 
                     <div>
-                      <label className="block font-semibold text-gray-700 mb-1">Medio de Pago:</label>
-                      <select value={paymentMethodSelected} onChange={(e) => setPaymentMethodSelected(e.target.value)} className="w-full p-2 border rounded-xl bg-gray-100">
-                        <option value="Efectivo contra entrega">Efectivo contra entrega</option>
-                        <option value="Transferencia Bancaria (Alias: lvhogar.mp)">Transferencia (Alias: lvhogar.mp)</option>
-                        <option value="Mercado Pago">Mercado Pago</option>
-                      </select>
+                      <div className="flex justify-between items-center mb-1">
+                        <label className="font-medium">Descripción</label>
+                        <button type="button" onClick={handleGenerateAiDescription} disabled={isGeneratingAi} className="text-[10px] text-amber-700 bg-amber-100 hover:bg-amber-200 px-2 py-0.5 rounded-md font-semibold">
+                          <i className="fa-solid fa-wand-magic-sparkles"></i> Redactar con IA
+                        </button>
+                      </div>
+                      <textarea value={newProd.description} onChange={e=>setNewProd({...newProd, description: e.target.value})} className="w-full p-2 border rounded-xl h-20 bg-gray-50"></textarea>
                     </div>
 
-                    <div className="bg-gray-100 p-2.5 rounded-xl space-y-1">
-                      <div className="flex justify-between text-gray-600"><span>Subtotal:</span><span>${getSubtotal().toLocaleString('es-AR')}</span></div>
-                      <div className="flex justify-between text-gray-600"><span>Envío:</span><span>${getDeliveryCost().toLocaleString('es-AR')}</span></div>
-                      <div style={{ color: primaryColor }} className="flex justify-between font-serif font-bold border-t pt-1"><span>Total:</span><span>${getTotal().toLocaleString('es-AR')}</span></div>
-                    </div>
-
-                    <button onClick={handleCheckoutWhatsApp} style={{ backgroundColor: primaryColor }} className="w-full text-white font-medium py-2.5 rounded-xl flex items-center justify-center gap-2 shadow">
-                      <i className="fa-brands fa-whatsapp text-lg"></i> Confirmar Pedido por WhatsApp
+                    <button type="submit" style={{ backgroundColor: primaryColor }} className="w-full text-white font-medium py-2.5 rounded-xl shadow">
+                      Guardar Producto en Supabase
                     </button>
+                  </form>
+                </div>
+
+                {/* Inventario */}
+                <div className="bg-white p-5 rounded-2xl shadow-sm border space-y-3 text-xs md:col-span-2">
+                  <h3 className="font-serif font-bold text-sm">Inventario en Tiempo Real ({products.length})</h3>
+                  {loadingList ? (
+                    <div className="text-center py-10 text-gray-400">Cargando inventario de Supabase...</div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse">
+                        <thead>
+                          <tr className="border-b bg-gray-50 text-gray-600">
+                            <th className="p-2.5">Foto</th>
+                            <th className="p-2.5">Producto</th>
+                            <th className="p-2.5">Categoría</th>
+                            <th className="p-2.5">Precio</th>
+                            <th className="p-2.5">Stock</th>
+                            <th className="p-2.5 text-right">Acción</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {products.map(p => (
+                            <tr key={p.id} className="border-b hover:bg-gray-50">
+                              <td className="p-2.5"><img src={p.image || 'https://images.unsplash.com/photo-1583847268964-b28dc8f51f92?auto=format&fit=crop&w=600&q=80'} className="w-10 h-10 object-cover rounded-lg border" /></td>
+                              <td className="p-2.5 font-semibold">{p.title}</td>
+                              <td className="p-2.5 text-gray-500">{p.category}</td>
+                              <td style={{ color: primaryColor }} className="p-2.5 font-serif font-bold">${Number(p.price).toLocaleString('es-AR')}</td>
+                              <td className="p-2.5"><span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${Number(p.stock) > 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}`}>{p.stock} un.</span></td>
+                              <td className="p-2.5 text-right">
+                                <button onClick={() => handleDeleteProduct(p.id)} className="text-red-400 hover:text-red-600"><i className="fa-solid fa-trash"></i></button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {tab === 'design' && (
+              <form onSubmit={handleSaveConfig} className="bg-white p-6 rounded-2xl shadow-sm border space-y-4 text-xs max-w-2xl">
+                <h3 className="font-serif font-bold text-sm">Configuración de la Marca, Ubicación y Colores</h3>
+                
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block font-medium mb-1">Nombre de la Tienda</label>
+                    <input type="text" value={config.storeName} onChange={e=>setConfig({...config, storeName: e.target.value})} className="w-full p-2 border rounded-xl bg-gray-50" />
+                  </div>
+                  <div>
+                    <label className="block font-medium mb-1">Teléfono WhatsApp</label>
+                    <input type="text" value={config.whatsappNumber} onChange={e=>setConfig({...config, whatsappNumber: e.target.value})} className="w-full p-2 border rounded-xl bg-gray-50" />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block font-medium mb-1">Ubicación visible</label>
+                    <input type="text" value={config.locationText} onChange={e=>setConfig({...config, locationText: e.target.value})} className="w-full p-2 border rounded-xl bg-gray-50" />
+                  </div>
+                  <div>
+                    <label className="block font-medium mb-1">Horarios de atención</label>
+                    <input type="text" value={config.locationHours} onChange={e=>setConfig({...config, locationHours: e.target.value})} className="w-full p-2 border rounded-xl bg-gray-50" />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <label className="block font-medium mb-1">Color Principal</label>
+                    <input type="color" value={config.brandColor} onChange={e=>setConfig({...config, brandColor: e.target.value})} className="w-full h-9 p-1 border rounded-xl cursor-pointer" />
+                  </div>
+                  <div>
+                    <label className="block font-medium mb-1">Color Secundario</label>
+                    <input type="color" value={config.secondaryColor} onChange={e=>setConfig({...config, secondaryColor: e.target.value})} className="w-full h-9 p-1 border rounded-xl cursor-pointer" />
+                  </div>
+                  <div>
+                    <label className="block font-medium mb-1">Tipografía</label>
+                    <select value={config.fontFamily} onChange={e=>setConfig({...config, fontFamily: e.target.value})} className="w-full p-2 border rounded-xl bg-gray-50">
+                      <option value="sans">Montserrat</option>
+                      <option value="serif">Playfair Display</option>
+                      <option value="poppins">Poppins</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block font-medium mb-1">Título Banner Promocional</label>
+                  <input type="text" value={config.bannerTitle} onChange={e=>setConfig({...config, bannerTitle: e.target.value})} className="w-full p-2 border rounded-xl bg-gray-50" />
+                </div>
+
+                <button type="submit" style={{ backgroundColor: primaryColor }} className="text-white font-medium px-6 py-2.5 rounded-xl shadow">
+                  Guardar Configuración de Diseño
+                </button>
+              </form>
+            )}
+
+            {tab === 'history' && (
+              <div className="bg-white p-6 rounded-2xl shadow-sm border space-y-4 text-xs">
+                <h3 className="font-serif font-bold text-sm">Historial de Pedidos Recibidos</h3>
+                {orderHistory.length === 0 ? (
+                  <p className="text-gray-400">No hay registros recientes de pedidos.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {orderHistory.map(ord => (
+                      <div key={ord.id} className="p-3 border rounded-xl bg-gray-50 flex justify-between items-center">
+                        <div>
+                          <p className="font-bold text-gray-800">Pedido #{ord.id} - {ord.date}</p>
+                          <p className="text-gray-500">{ord.items.length} productos | Estado: {ord.status}</p>
+                        </div>
+                        <span style={{ color: primaryColor }} className="font-serif font-bold text-sm">${ord.total.toLocaleString('es-AR')}</span>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
-            </div>
-          )}
-
-          <footer style={{ backgroundColor: headerBg }} className="text-gray-400 py-8 text-center text-xs mt-auto border-t border-white/10">
-            <p>© {new Date().getFullYear()} {config.storeName}. {config.locationText}.</p>
-            <a href="admin.html" className="text-gray-500 hover:text-white text-[10px] block mt-2">Acceso Administrador</a>
-          </footer>
+            )}
+          </main>
         </div>
       );
     }
 
-    ReactDOM.createRoot(document.getElementById('root')).render(<CatalogApp />);
+    ReactDOM.createRoot(document.getElementById('root')).render(<AdminApp />);
   </script>
 </body>
 </html>
