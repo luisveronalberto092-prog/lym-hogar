@@ -14,8 +14,22 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&family=Playfair+Display:wght@500;600;700&family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            serif: ['Playfair Display', 'serif'],
+            sans: ['Montserrat', 'sans-serif'],
+            poppins: ['Poppins', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
 </head>
-<body class="bg-[#FAFAF7] text-gray-800 font-sans antialiased">
+<body class="antialiased transition-colors duration-300 bg-[#FAFAF7] text-gray-800 font-sans">
   <div id="root"></div>
 
   <script type="text/babel">
@@ -25,31 +39,91 @@
     const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNsZWR1YWFrbWViY25sZHFlYW9vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMyMjYxMzgsImV4cCI6MjEwODgwMjEzOH0.Wl1DsflvOJLNDCaCjdNyaGe91KpCH7zpqZGJVDOpH2s";
     const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+    const DEFAULT_CONFIG = {
+      storeName: "L&V HOGAR",
+      storeSubtitle: "Artículos para el hogar y cuidado personal",
+      whatsappNumber: "5493512102238",
+      whatsappMsg: "¡Hola L&V HOGAR! Quisiera realizar el siguiente pedido:\n\n",
+      locationText: "Malvinas Argentinas y Córdoba Capital",
+      locationHours: "Lunes a Sábados: 09:00 a 20:00 hs",
+      showBanner: true,
+      bannerTitle: "Renueva tu Hogar con Estilo y Calidez",
+      bannerText: "Envíos locales a domicilio y atención personalizada por WhatsApp.",
+      brandColor: "#768C77",
+      secondaryColor: "#C8B297",
+      bgColor: "#FAFAF7",
+      headerBg: "#1C1F1D",
+      categories: ["Hogar", "Cuidado Personal", "Electrodomésticos", "Bazar y Cocina", "Aromas y Decoración", "Accesorios"],
+      deliveryZones: [
+        { name: "Malvinas Argentinas - 1ª Sección", price: 0 },
+        { name: "Malvinas Argentinas - 2ª Sección", price: 500 },
+        { name: "Malvinas Argentinas - 3ª Sección", price: 800 },
+        { name: "Córdoba Capital (Otras zonas)", price: 1500 }
+      ]
+    };
+
     function CatalogApp() {
+      const [config, setConfig] = useState(() => JSON.parse(localStorage.getItem('lv_config')) || DEFAULT_CONFIG);
       const [products, setProducts] = useState([]);
-      const [loading, setLoading] = useState(true);
+      const [loadingProducts, setLoadingProducts] = useState(true);
+      
       const [cart, setCart] = useState([]);
       const [isCartOpen, setIsCartOpen] = useState(false);
+      const [searchQuery, setSearchQuery] = useState('');
       const [selectedCategory, setSelectedCategory] = useState('Todos');
+      const [sortBy, setSortBy] = useState('default');
+      
+      const [selectedProductModal, setSelectedProductModal] = useState(null);
+      const [activeModalImage, setActiveModalImage] = useState('');
+      
+      const [fulfillmentType, setFulfillmentType] = useState('delivery');
+      const [selectedDeliveryZone, setSelectedDeliveryZone] = useState(0);
       const [clientName, setClientName] = useState('');
       const [clientAddress, setClientAddress] = useState('');
+      const [clientDni, setClientDni] = useState('');
+      const [preferredTime, setPreferredTime] = useState('Indistinto');
+      const [paymentMethodSelected, setPaymentMethodSelected] = useState('Efectivo contra entrega');
+      
+      const [addressError, setAddressError] = useState(false);
+      const [nameError, setNameError] = useState(false);
+      const [quantities, setQuantities] = useState({});
+      const [chosenVariant, setChosenVariant] = useState({});
 
-      const categories = ['Todos', 'Hogar', 'Cuidado Personal', 'Electrodomésticos', 'Bazar y Cocina', 'Aromas y Decoración', 'Accesorios'];
+      const [newReviewText, setNewReviewText] = useState('');
+      const [newReviewRating, setNewReviewRating] = useState(5);
+      const [reviewSent, setReviewSent] = useState(false);
+
+      const fetchProductsFromSupabase = async () => {
+        try {
+          const { data, error } = await supabaseClient
+            .from('productos')
+            .select('*')
+            .order('id', { ascending: false });
+
+          if (error) throw error;
+          setProducts(data || []);
+        } catch (err) {
+          console.error("Error al obtener productos:", err);
+        } finally {
+          setLoadingProducts(false);
+        }
+      };
 
       useEffect(() => {
-        async function loadData() {
-          try {
-            const { data, error } = await supabaseClient.from('productos').select('*');
-            if (error) throw error;
-            setProducts(data || []);
-          } catch (err) {
-            console.error("Error conectando a Supabase:", err);
-          } finally {
-            setLoading(false);
-          }
-        }
-        loadData();
+        fetchProductsFromSupabase();
+        const channel = supabaseClient
+          .channel('schema-db-changes')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'productos' }, () => {
+            fetchProductsFromSupabase();
+          })
+          .subscribe();
+
+        return () => { supabaseClient.removeChannel(channel); };
       }, []);
+
+      const primaryColor = config.brandColor || '#768C77';
+      const secondaryColor = config.secondaryColor || '#C8B297';
+      const headerBg = config.headerBg || '#1C1F1D';
 
       const getCategoryIcon = (cat) => {
         const lower = cat.toLowerCase();
@@ -61,100 +135,431 @@
         return 'fa-box-open';
       };
 
-      const filteredProducts = selectedCategory === 'Todos' 
-        ? products 
-        : products.filter(p => p.category === selectedCategory);
+      const handleQtyChange = (productId, delta) => {
+        setQuantities(prev => {
+          const current = prev[productId] || 1;
+          const updated = current + delta;
+          return { ...prev, [productId]: updated > 0 ? updated : 1 };
+        });
+      };
+
+      const addToCart = (product) => {
+        const qtyToAdd = quantities[product.id] || 1;
+        let variantString = "";
+        if (product.variants && product.variants.trim()) {
+          const optionsArray = product.variants.split(',').map(v => v.trim());
+          variantString = chosenVariant[product.id] || optionsArray[0];
+        }
+
+        const cartItemId = variantString ? `${product.id}-${variantString}` : product.id;
+
+        setCart(prev => {
+          const exists = prev.find(item => item.cartItemId === cartItemId);
+          if (exists) {
+            return prev.map(item => item.cartItemId === cartItemId ? { ...item, qty: item.qty + qtyToAdd } : item);
+          }
+          return [...prev, { ...product, cartItemId, qty: qtyToAdd, selectedVariant: variantString }];
+        });
+        setIsCartOpen(true);
+      };
+
+      const updateQty = (cartItemId, delta) => {
+        setCart(prev => prev.map(item => {
+          if (item.cartItemId === cartItemId) {
+            const newQty = item.qty + delta;
+            return newQty > 0 ? { ...item, qty: newQty } : item;
+          }
+          return item;
+        }));
+      };
+
+      const removeFromCart = (cartItemId) => setCart(prev => prev.filter(item => item.cartItemId !== cartItemId));
+
+      const getSubtotal = () => cart.reduce((sum, item) => sum + (Number(item.price) * item.qty), 0);
+      const getDeliveryCost = () => {
+        if (fulfillmentType === 'pickup') return 0;
+        return config.deliveryZones ? config.deliveryZones[selectedDeliveryZone].price : 0;
+      };
+      const getTotal = () => getSubtotal() + getDeliveryCost();
+
+      const generateOrderText = () => {
+        let message = config.whatsappMsg || "¡Hola L&V HOGAR! Quisiera realizar el siguiente pedido:\n\n";
+        if (clientName.trim()) message += `👤 *Cliente:* ${clientName.trim()}\n`;
+        message += `🛒 *PRODUCTOS:*\n`;
+        cart.forEach(item => {
+          const varText = item.selectedVariant ? ` [${item.selectedVariant}]` : '';
+          message += `• ${item.title}${varText} x${item.qty} - $${(Number(item.price) * item.qty).toLocaleString('es-AR')}\n`;
+        });
+        message += `\n💵 *Subtotal:* $${getSubtotal().toLocaleString('es-AR')}`;
+        if (fulfillmentType === 'delivery') {
+          const zone = config.deliveryZones ? config.deliveryZones[selectedDeliveryZone] : { name: "Estándar", price: 0 };
+          message += `\n🚚 *Entrega:* Envío a Domicilio (${zone.name} - $${zone.price.toLocaleString('es-AR')})`;
+          message += `\n📍 *Dirección:* ${clientAddress.trim()}`;
+        } else {
+          message += `\n🏪 *Entrega:* Retiro en Punto / Local`;
+        }
+        if (clientDni.trim()) message += `\n🆔 *DNI:* ${clientDni.trim()}`;
+        message += `\n⏰ *Horario Preferido:* ${preferredTime}`;
+        message += `\n💳 *Medio de Pago:* ${paymentMethodSelected}`;
+        message += `\n\n💰 *TOTAL FINAL:* $${getTotal().toLocaleString('es-AR')}\n\n¿Me confirman la recepción del pedido?`;
+        return message;
+      };
+
+      const handleCheckoutWhatsApp = () => {
+        if (cart.length === 0) return;
+        if (!clientName.trim()) { setNameError(true); return; } else setNameError(false);
+        if (fulfillmentType === 'delivery' && !clientAddress.trim()) { setAddressError(true); return; } else setAddressError(false);
+
+        const currentHistory = JSON.parse(localStorage.getItem('lv_order_history')) || [];
+        const newOrder = {
+          id: Date.now(),
+          date: new Date().toLocaleString('es-AR'),
+          items: cart,
+          total: getTotal(),
+          status: 'Enviado por WhatsApp'
+        };
+        localStorage.setItem('lv_order_history', JSON.stringify([newOrder, ...currentHistory]));
+
+        window.open(`https://wa.me/${config.whatsappNumber}?text=${encodeURIComponent(generateOrderText())}`, '_blank');
+      };
+
+      const handleAddReview = async () => {
+        if (!selectedProductModal) return;
+        try {
+          const currentRating = Number(selectedProductModal.rating || 5);
+          const currentCount = Number(selectedProductModal.reviews_count || 1);
+          
+          const newCount = currentCount + 1;
+          const newAvg = ((currentRating * currentCount) + newReviewRating) / newCount;
+
+          await supabaseClient
+            .from('productos')
+            .update({ rating: newAvg.toFixed(1), reviews_count: newCount })
+            .eq('id', selectedProductModal.id);
+
+          setReviewSent(true);
+          setTimeout(() => { setReviewSent(false); setNewReviewText(''); }, 3000);
+          fetchProductsFromSupabase();
+        } catch (err) {
+          console.error("Error al enviar reseña:", err);
+        }
+      };
+
+      const categories = ['Todos', ...(config.categories || ["Hogar", "Cuidado Personal", "Electrodomésticos"])];
+      const filteredProducts = products.filter(p => {
+        const matchesCat = selectedCategory === 'Todos' || p.category === selectedCategory;
+        const matchesSearch = p.title?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                              p.description?.toLowerCase().includes(searchQuery.toLowerCase());
+        return matchesCat && matchesSearch;
+      }).sort((a, b) => {
+        if (sortBy === 'low-high') return Number(a.price) - Number(b.price);
+        if (sortBy === 'high-low') return Number(b.price) - Number(a.price);
+        return 0;
+      });
 
       return (
         <div className="min-h-screen flex flex-col">
-          {/* Barra superior */}
-          <div className="bg-[#768C77] text-white text-[11px] py-1.5 px-4 text-center">
-            📍 Malvinas Argentinas y Córdoba Capital | ⏰ Lun a Sáb: 9 a 20hs
+          <div style={{ backgroundColor: primaryColor }} className="text-white text-[11px] py-1.5 px-4 text-center">
+            📍 {config.locationText} | ⏰ {config.locationHours}
           </div>
 
-          {/* Header */}
-          <header className="bg-[#1C1F1D] text-white py-4 px-6 flex justify-between items-center shadow-md">
-            <div>
-              <h1 className="text-lg font-serif tracking-widest text-white">L&V HOGAR</h1>
-              <p className="text-[10px] text-[#C8B297] uppercase">Artículos para el hogar y cuidado personal</p>
+          <header style={{ backgroundColor: headerBg }} className="text-white py-4 px-6 flex justify-between items-center shadow-md sticky top-0 z-40 border-b border-white/10">
+            <div className="flex items-center space-x-3">
+              <div style={{ borderColor: secondaryColor }} className="w-10 h-10 border rounded-full flex flex-col items-center justify-center bg-black/40">
+                <span style={{ color: primaryColor }} className="font-serif font-bold text-xs">L&V</span>
+              </div>
+              <div>
+                <h1 className="text-base font-serif tracking-widest text-white">{config.storeName}</h1>
+                <p className="text-[9px] text-[#C8B297] uppercase">Artículos para el hogar y cuidado personal</p>
+              </div>
             </div>
             <button 
               onClick={() => setIsCartOpen(true)}
-              className="bg-[#768C77] text-white px-4 py-2 rounded-full text-xs font-medium flex items-center gap-2"
+              style={{ backgroundColor: primaryColor }}
+              className="text-white px-4 py-2 rounded-full text-xs font-medium flex items-center gap-2 shadow"
             >
               <i className="fa-solid fa-bag-shopping"></i> Carrito ({cart.reduce((s, i) => s + i.qty, 0)})
             </button>
           </header>
 
-          {/* Contenido */}
           <main className="max-w-7xl mx-auto px-4 py-8 flex-grow w-full">
-            <h2 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3">Explorar por Categoría</h2>
-            
-            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 mb-8">
-              {categories.map(cat => (
-                <button
-                  key={cat}
-                  onClick={() => setSelectedCategory(cat)}
-                  className={`p-3.5 rounded-2xl border text-left transition flex flex-col justify-between items-start ${
-                    selectedCategory === cat 
-                      ? 'bg-[#768C77] text-white border-[#768C77] shadow-md' 
-                      : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
-                  }`}
-                >
-                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-xs ${selectedCategory === cat ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'}`}>
-                    <i className={`fa-solid ${cat === 'Todos' ? 'fa-border-all' : getCategoryIcon(cat)}`}></i>
-                  </div>
-                  <span className="font-semibold text-xs mt-3 line-clamp-1">{cat}</span>
-                </button>
-              ))}
+            <div className="mb-6 flex justify-between items-center flex-wrap gap-4">
+              <div className="flex gap-2 overflow-x-auto pb-1 max-w-full">
+                {categories.map(cat => (
+                  <button
+                    key={cat}
+                    onClick={() => setSelectedCategory(cat)}
+                    className={`px-4 py-2 rounded-full text-xs font-medium transition whitespace-nowrap ${
+                      selectedCategory === cat 
+                        ? 'bg-[#768C77] text-white shadow-md' 
+                        : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    <i className={`fa-solid ${cat === 'Todos' ? 'fa-border-all' : getCategoryIcon(cat)} mr-1`}></i> {cat}
+                  </button>
+                ))}
+              </div>
+
+              <select 
+                value={sortBy} 
+                onChange={(e) => setSortBy(e.target.value)}
+                className="bg-white border border-gray-200 rounded-full px-4 py-2 text-xs text-gray-700 focus:outline-none shadow-xs"
+              >
+                <option value="default">Destacados</option>
+                <option value="low-high">Precio: Menor a Mayor</option>
+                <option value="high-low">Precio: Mayor a Menor</option>
+              </select>
             </div>
 
-            {loading ? (
+            {loadingProducts ? (
               <div className="text-center py-20 text-gray-500">
                 <i className="fa-solid fa-spinner animate-spin text-2xl mb-2"></i>
-                <p>Cargando tienda...</p>
+                <p>Cargando productos...</p>
               </div>
             ) : filteredProducts.length === 0 ? (
-              <div className="text-center py-20 text-gray-400">No hay productos en esta categoría o conectando con Supabase.</div>
+              <div className="text-center py-20 text-gray-400">No se encontraron productos disponibles.</div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                {filteredProducts.map(product => (
-                  <div key={product.id} className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden flex flex-col justify-between">
-                    <div>
-                      <div className="h-52 bg-gray-100 overflow-hidden relative">
-                        <img src={product.image || 'https://images.unsplash.com/photo-1583847268964-b28dc8f51f92?auto=format&fit=crop&w=600&q=80'} alt={product.title} className="w-full h-full object-cover" />
+                {filteredProducts.map(product => {
+                  const isAvailable = Number(product.stock) > 0;
+                  return (
+                    <div key={product.id} className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden flex flex-col justify-between hover:shadow-md transition">
+                      <div>
+                        <div 
+                          className="h-52 bg-gray-100 overflow-hidden relative cursor-pointer group"
+                          onClick={() => { setSelectedProductModal(product); setActiveModalImage(product.image); }}
+                        >
+                          <img src={product.image || 'https://images.unsplash.com/photo-1583847268964-b28dc8f51f92?auto=format&fit=crop&w=600&q=80'} alt={product.title} className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
+                          
+                          {product.video && (
+                            <span className="absolute bottom-3 left-3 bg-[#768C77] text-white text-[10px] font-bold px-2 py-1 rounded-lg flex items-center gap-1 shadow">
+                              <i className="fa-solid fa-play"></i> Video
+                            </span>
+                          )}
+
+                          <span className="absolute top-3 right-3 bg-black/50 text-white text-[10px] px-2.5 py-1 rounded-full backdrop-blur-xs">
+                            <i className="fa-solid fa-expand mr-1"></i> Ampliar
+                          </span>
+                        </div>
+                        <div className="p-5">
+                          <span className="text-[10px] font-semibold text-[#768C77] uppercase">{product.category}</span>
+                          <h3 
+                            className="font-serif text-base text-gray-800 mt-1 cursor-pointer hover:underline"
+                            onClick={() => { setSelectedProductModal(product); setActiveModalImage(product.image); }}
+                          >
+                            {product.title}
+                          </h3>
+                          <p className="text-gray-500 text-xs mt-2 line-clamp-2">{product.description}</p>
+                        </div>
                       </div>
-                      <div className="p-5">
-                        <span className="text-[10px] font-semibold text-[#768C77] uppercase">{product.category}</span>
-                        <h3 className="font-serif text-base text-gray-800 mt-1">{product.title}</h3>
-                        <p className="text-gray-500 text-xs mt-2 line-clamp-2">{product.description}</p>
+
+                      <div className="p-5 pt-0 flex justify-between items-center">
+                        <span className="text-lg font-serif font-bold text-[#768C77]">${Number(product.price).toLocaleString('es-AR')}</span>
+                        <button 
+                          onClick={() => { setSelectedProductModal(product); setActiveModalImage(product.image); }}
+                          className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded-lg text-xs font-medium"
+                        >
+                          Ver Detalle
+                        </button>
                       </div>
                     </div>
-                    <div className="p-5 pt-0 flex justify-between items-center">
-                      <span className="text-lg font-serif font-bold text-[#768C77]">${Number(product.price).toLocaleString('es-AR')}</span>
-                      <button 
-                        onClick={() => {
-                          setCart(prev => {
-                            const exists = prev.find(item => item.id === product.id);
-                            if (exists) return prev.map(i => i.id === product.id ? {...i, qty: i.qty + 1} : i);
-                            return [...prev, {...product, qty: 1}];
-                          });
-                          setIsCartOpen(true);
-                        }}
-                        className="bg-[#768C77] text-white px-3 py-1.5 rounded-lg text-xs font-medium"
-                      >
-                        Agregar
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </main>
 
-          {/* Footer */}
+          {/* MODAL AMPLIADO DE DETALLE Y FOTOS */}
+          {selectedProductModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-xs overflow-y-auto">
+              <div className="bg-white rounded-2xl max-w-2xl w-full overflow-hidden shadow-2xl border border-gray-200 my-auto max-h-[90vh] flex flex-col md:flex-row">
+                
+                {/* Columna de Fotos y Video */}
+                <div className="w-full md:w-1/2 bg-gray-50 p-4 flex flex-col justify-between border-r">
+                  <div className="relative h-64 sm:h-72 bg-black rounded-xl overflow-hidden shadow-inner flex items-center justify-center">
+                    <img src={activeModalImage || selectedProductModal.image} alt={selectedProductModal.title} className="w-full h-full object-contain" />
+                  </div>
+
+                  {/* Galería de miniaturas */}
+                  {selectedProductModal.gallery && selectedProductModal.gallery.length > 0 && (
+                    <div className="flex gap-2 mt-3 overflow-x-auto pb-1">
+                      <img 
+                        src={selectedProductModal.image} 
+                        onClick={() => setActiveModalImage(selectedProductModal.image)}
+                        className={`w-14 h-14 object-cover rounded-lg cursor-pointer border-2 ${activeModalImage === selectedProductModal.image ? 'border-[#768C77]' : 'border-transparent'}`} 
+                      />
+                      {selectedProductModal.gallery.map((imgUrl, idx) => (
+                        <img 
+                          key={idx} 
+                          src={imgUrl} 
+                          onClick={() => setActiveModalImage(imgUrl)}
+                          className={`w-14 h-14 object-cover rounded-lg cursor-pointer border-2 ${activeModalImage === imgUrl ? 'border-[#768C77]' : 'border-transparent'}`} 
+                        />
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Video en modal si tiene */}
+                  {selectedProductModal.video && (
+                    <div className="mt-3">
+                      <p className="text-[11px] font-bold text-gray-700 mb-1"><i className="fa-solid fa-play text-[#768C77] mr-1"></i> Video Demostrativo:</p>
+                      <video src={selectedProductModal.video} controls className="w-full h-32 object-cover rounded-xl bg-black"></video>
+                    </div>
+                  )}
+                </div>
+
+                {/* Columna de Detalles y Compra */}
+                <div className="w-full md:w-1/2 p-6 flex flex-col justify-between overflow-y-auto max-h-[85vh]">
+                  <div>
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <span className="text-[10px] font-semibold text-[#768C77] uppercase tracking-widest">{selectedProductModal.category}</span>
+                        <h3 className="text-xl font-serif font-bold text-gray-800 mt-0.5">{selectedProductModal.title}</h3>
+                      </div>
+                      <button onClick={() => setSelectedProductModal(null)} className="text-gray-400 hover:text-gray-600 text-lg">
+                        <i className="fa-solid fa-xmark"></i>
+                      </button>
+                    </div>
+
+                    <div className="mt-2 flex items-center justify-between">
+                      <span className="text-2xl font-serif font-bold text-[#768C77]">${Number(selectedProductModal.price).toLocaleString('es-AR')}</span>
+                      <span className={`text-[10px] font-semibold px-2.5 py-1 rounded-full ${Number(selectedProductModal.stock) > 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}`}>
+                        {Number(selectedProductModal.stock) > 0 ? `Stock: ${selectedProductModal.stock} un.` : 'Agotado'}
+                      </span>
+                    </div>
+
+                    <p className="text-xs text-gray-600 leading-relaxed mt-4 font-light">{selectedProductModal.description}</p>
+
+                    {/* Calificaciones */}
+                    <div className="mt-4 pt-3 border-t space-y-2">
+                      <div className="flex items-center gap-2">
+                        <div className="flex text-amber-400 text-xs">
+                          {[1, 2, 3, 4, 5].map(star => (
+                            <i key={star} className={`fa-solid fa-star ${star <= Math.round(selectedProductModal.rating || 5) ? 'text-amber-400' : 'text-gray-200'}`}></i>
+                          ))}
+                        </div>
+                        <span className="text-xs font-bold text-gray-700">{selectedProductModal.rating || '5.0'}</span>
+                        <span className="text-xs text-gray-400">({selectedProductModal.reviews_count || 1} opiniones)</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-6 pt-4 border-t space-y-3">
+                    {Number(selectedProductModal.stock) > 0 ? (
+                      <button 
+                        onClick={() => { addToCart(selectedProductModal); setSelectedProductModal(null); }}
+                        className="w-full bg-[#768C77] text-white font-medium py-3 rounded-xl flex items-center justify-center gap-2 shadow hover:opacity-90 text-xs"
+                      >
+                        <i className="fa-solid fa-bag-shopping"></i> Agregar al Carrito
+                      </button>
+                    ) : (
+                      <button disabled className="w-full bg-gray-200 text-gray-400 font-medium py-3 rounded-xl text-xs cursor-not-allowed">Producto Agotado</button>
+                    )}
+                  </div>
+
+                </div>
+
+              </div>
+            </div>
+          )}
+
+          {/* Carrito Lateral */}
+          {isCartOpen && (
+            <div className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-xs">
+              <div className="bg-white w-full max-w-md h-full flex flex-col justify-between shadow-2xl p-6 overflow-y-auto">
+                <div>
+                  <div className="flex justify-between items-center pb-4 border-b">
+                    <h3 className="font-serif text-lg text-gray-800 flex items-center gap-2">
+                      <i className="fa-solid fa-bag-shopping text-[#768C77]"></i> Tu Pedido
+                    </h3>
+                    <button onClick={() => setIsCartOpen(false)} className="text-gray-400 hover:text-gray-600">
+                      <i className="fa-solid fa-xmark text-lg"></i>
+                    </button>
+                  </div>
+
+                  {cart.length === 0 ? (
+                    <div className="text-center py-12 text-gray-400 text-xs">Tu carrito está vacío.</div>
+                  ) : (
+                    <div className="divide-y my-4 max-h-40 overflow-y-auto pr-1">
+                      {cart.map(item => (
+                        <div key={item.cartItemId} className="py-3 flex items-center justify-between text-xs">
+                          <div className="flex items-center gap-3">
+                            <img src={item.image} alt={item.title} className="w-12 h-12 object-cover rounded-xl border" />
+                            <div>
+                              <p className="font-serif font-bold text-gray-800">{item.title}</p>
+                              <p className="text-gray-500">${Number(item.price).toLocaleString('es-AR')}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button onClick={() => updateQty(item.cartItemId, -1)} className="bg-gray-100 px-2 py-0.5 rounded font-bold">-</button>
+                            <span className="font-bold">{item.qty}</span>
+                            <button onClick={() => updateQty(item.cartItemId, 1)} className="bg-gray-100 px-2 py-0.5 rounded font-bold">+</button>
+                            <button onClick={() => removeFromCart(item.cartItemId)} className="text-red-400 hover:text-red-600 ml-1"><i className="fa-solid fa-trash-can"></i></button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {cart.length > 0 && (
+                  <div className="border-t pt-3 space-y-2.5 text-xs">
+                    <div>
+                      <label className="block font-semibold text-gray-700 mb-1">Nombre y Apellido: <span className="text-red-500">*</span></label>
+                      <input type="text" placeholder="Tu nombre completo..." value={clientName} onChange={(e) => { setClientName(e.target.value); setNameError(false); }} className={`w-full p-2 border rounded-xl bg-gray-100 ${nameError ? 'border-red-500' : 'border-gray-200'}`} />
+                    </div>
+
+                    <div>
+                      <label className="block font-semibold text-gray-700 mb-1">Método de Entrega:</label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button type="button" onClick={() => setFulfillmentType('delivery')} className={`p-2 rounded-xl border text-[11px] font-medium transition ${fulfillmentType === 'delivery' ? 'bg-gray-100 border-gray-400 font-bold' : 'border-gray-200'}`}>🚚 Envío a Domicilio</button>
+                        <button type="button" onClick={() => setFulfillmentType('pickup')} className={`p-2 rounded-xl border text-[11px] font-medium transition ${fulfillmentType === 'pickup' ? 'bg-gray-100 border-gray-400 font-bold' : 'border-gray-200'}`}>🏪 Retiro en Punto</button>
+                      </div>
+                    </div>
+
+                    {fulfillmentType === 'delivery' && (
+                      <>
+                        <div>
+                          <label className="block font-semibold text-gray-700 mb-1">Zona de Envío:</label>
+                          <select value={selectedDeliveryZone} onChange={(e) => setSelectedDeliveryZone(Number(e.target.value))} className="w-full p-2 border rounded-xl bg-gray-100">
+                            {config.deliveryZones && config.deliveryZones.map((zone, idx) => (
+                              <option key={idx} value={idx}>{zone.name} - ${zone.price.toLocaleString('es-AR')}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block font-semibold text-gray-700 mb-1">Dirección de Entrega: <span className="text-red-500">*</span></label>
+                          <input type="text" placeholder="Calle, Número, Barrio..." value={clientAddress} onChange={(e) => { setClientAddress(e.target.value); setAddressError(false); }} className={`w-full p-2 border rounded-xl bg-gray-100 ${addressError ? 'border-red-500' : 'border-gray-200'}`} />
+                        </div>
+                      </>
+                    )}
+
+                    <div>
+                      <label className="block font-semibold text-gray-700 mb-1">Medio de Pago:</label>
+                      <select value={paymentMethodSelected} onChange={(e) => setPaymentMethodSelected(e.target.value)} className="w-full p-2 border rounded-xl bg-gray-100">
+                        <option value="Efectivo contra entrega">Efectivo contra entrega</option>
+                        <option value="Transferencia Bancaria (Alias: lvhogar.mp)">Transferencia (Alias: lvhogar.mp)</option>
+                        <option value="Mercado Pago">Mercado Pago</option>
+                      </select>
+                    </div>
+
+                    <div className="bg-gray-100 p-2.5 rounded-xl space-y-1">
+                      <div className="flex justify-between text-gray-600"><span>Subtotal:</span><span>${getSubtotal().toLocaleString('es-AR')}</span></div>
+                      <div className="flex justify-between text-gray-600"><span>Envío:</span><span>${getDeliveryCost().toLocaleString('es-AR')}</span></div>
+                      <div className="flex justify-between font-serif font-bold border-t pt-1 text-[#768C77]"><span>Total:</span><span>${getTotal().toLocaleString('es-AR')}</span></div>
+                    </div>
+
+                    <button onClick={handleCheckoutWhatsApp} className="w-full bg-[#768C77] text-white font-medium py-2.5 rounded-xl flex items-center justify-center gap-2 shadow text-xs">
+                      <i className="fa-brands fa-whatsapp text-lg"></i> Confirmar Pedido por WhatsApp
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           <footer className="bg-[#1C1F1D] text-gray-400 py-6 text-center text-xs mt-auto">
-            <p>© L&V HOGAR - Malvinas Argentinas y Córdoba Capital</p>
+            <p>© L&V HOGAR - {config.locationText}</p>
             <a href="admin.html" className="text-gray-500 hover:text-white text-[10px] block mt-2">Acceso Administrador</a>
           </footer>
         </div>
