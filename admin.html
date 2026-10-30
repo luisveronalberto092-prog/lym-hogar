@@ -29,13 +29,25 @@
       const [user, setUser] = useState('');
       const [pass, setPass] = useState('');
       const [error, setError] = useState('');
-      const [activeTab, setActiveTab] = useState('inventory'); // 'inventory' o 'history'
+      
+      // Pestañas: 'inventory', 'design', 'history'
+      const [activeTab, setActiveTab] = useState('inventory');
 
       const [products, setProducts] = useState([]);
       const [orderHistory, setOrderHistory] = useState([]);
       const [loading, setLoading] = useState(true);
       const [editingId, setEditingId] = useState(null);
       const [msg, setMsg] = useState('');
+
+      // Configuración de Diseño Gráfico y Estilos guardada en localStorage
+      const [storeConfig, setStoreConfig] = useState(() => {
+        return JSON.parse(localStorage.getItem('lv_store_design')) || {
+          brandColor: '#768C77',
+          headerBg: '#1C1F1D',
+          bannerTitle: 'Renueva tu Hogar con Estilo y Calidez',
+          bannerText: 'Envíos locales a domicilio y atención personalizada.'
+        };
+      });
 
       const [form, setForm] = useState({
         title: '', price: '', stock: '10', category: 'Hogar', image: '', video: '', description: '', variants: ''
@@ -158,6 +170,13 @@
         setAdditionalImages([]);
       };
 
+      const handleSaveDesign = e => {
+        e.preventDefault();
+        localStorage.setItem('lv_store_design', JSON.stringify(storeConfig));
+        setMsg('¡Diseño y estilos guardados con éxito!');
+        setTimeout(() => setMsg(''), 3000);
+      };
+
       // Estadísticas
       const totalInventoryValue = products.reduce((acc, p) => acc + (Number(p.price) * Number(p.stock || 0)), 0);
       const outOfStockCount = products.filter(p => Number(p.stock) === 0).length;
@@ -198,7 +217,7 @@
           <main className="max-w-6xl mx-auto p-6 w-full flex-grow space-y-6">
             {msg && <div className="p-3 bg-emerald-50 text-emerald-800 text-xs rounded-xl font-medium">{msg}</div>}
 
-            {/* Panel de Gráficos / Métricas */}
+            {/* Panel de Métricas / Gráficos */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
               <div className="bg-white p-4 rounded-2xl border shadow-sm flex items-center justify-between">
                 <div>
@@ -226,15 +245,16 @@
             </div>
 
             {/* Pestañas de Navegación Admin */}
-            <div className="flex gap-2 border-b pb-2">
-              <button onClick={() => setActiveTab('inventory')} className={`px-4 py-2 rounded-xl text-xs font-semibold ${activeTab === 'inventory' ? 'bg-[#768C77] text-white' : 'bg-white border text-gray-700'}`}>📦 Gestión de Inventario</button>
-              <button onClick={() => setActiveTab('history')} className={`px-4 py-2 rounded-xl text-xs font-semibold ${activeTab === 'history' ? 'bg-[#768C77] text-white' : 'bg-white border text-gray-700'}`}>📋 Historial de Pedidos ({orderHistory.length})</button>
+            <div className="flex gap-2 border-b pb-2 overflow-x-auto">
+              <button onClick={() => setActiveTab('inventory')} className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap ${activeTab === 'inventory' ? 'bg-[#768C77] text-white' : 'bg-white border text-gray-700'}`}>📦 Inventario</button>
+              <button onClick={() => setActiveTab('design')} className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap ${activeTab === 'design' ? 'bg-[#768C77] text-white' : 'bg-white border text-gray-700'}`}>🎨 Área de Diseño Gráfico</button>
+              <button onClick={() => setActiveTab('history')} className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap ${activeTab === 'history' ? 'bg-[#768C77] text-white' : 'bg-white border text-gray-700'}`}>📋 Historial de Pedidos ({orderHistory.length})</button>
             </div>
 
             {activeTab === 'inventory' ? (
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 
-                {/* Formulario de Carga / Edición con todos los datos */}
+                {/* Formulario de Carga / Edición */}
                 <div className="bg-white p-5 rounded-2xl border space-y-3 text-xs">
                   <div className="flex justify-between items-center">
                     <h3 className="font-serif font-bold text-sm">{editingId ? '✏️ Editar Producto' : '📦 Cargar Producto'}</h3>
@@ -348,6 +368,59 @@
                   )}
                 </div>
 
+              </div>
+            ) : activeTab === 'design' ? (
+              /* ÁREA DE DISEÑO GRÁFICO Y CONTROL VISUAL */
+              <div className="bg-white p-6 rounded-2xl border space-y-6 text-xs">
+                <div>
+                  <h3 className="font-serif font-bold text-sm text-gray-800 flex items-center gap-2">
+                    <i className="fa-solid fa-palette text-[#768C77]"></i> Área de Diseño Gráfico y Personalización
+                  </h3>
+                  <p className="text-gray-500 mt-1">Configurá la identidad visual, colores y textos de tu tienda pública en tiempo real.</p>
+                </div>
+
+                <form onSubmit={handleSaveDesign} className="space-y-4 max-w-lg">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block font-semibold text-gray-700 mb-1">Color Principal (Botones/Detalles):</label>
+                      <div className="flex items-center gap-2">
+                        <input type="color" value={storeConfig.brandColor} onChange={e => setStoreConfig({...storeConfig, brandColor: e.target.value})} className="w-10 h-10 rounded cursor-pointer border" />
+                        <span className="font-mono text-gray-600">{storeConfig.brandColor}</span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block font-semibold text-gray-700 mb-1">Color Cabecera (Header):</label>
+                      <div className="flex items-center gap-2">
+                        <input type="color" value={storeConfig.headerBg} onChange={e => setStoreConfig({...storeConfig, headerBg: e.target.value})} className="w-10 h-10 rounded cursor-pointer border" />
+                        <span className="font-mono text-gray-600">{storeConfig.headerBg}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block font-semibold text-gray-700 mb-1">Título del Banner Principal:</label>
+                    <input type="text" value={storeConfig.bannerTitle} onChange={e => setStoreConfig({...storeConfig, bannerTitle: e.target.value})} className="w-full p-2 border rounded-xl bg-gray-50" />
+                  </div>
+
+                  <div>
+                    <label className="block font-semibold text-gray-700 mb-1">Texto descriptivo del Banner:</label>
+                    <input type="text" value={storeConfig.bannerText} onChange={e => setStoreConfig({...storeConfig, bannerText: e.target.value})} className="w-full p-2 border rounded-xl bg-gray-50" />
+                  </div>
+
+                  <button type="submit" className="bg-[#768C77] text-white px-6 py-2.5 rounded-xl font-medium shadow">
+                    Guardar Configuración Visual
+                  </button>
+                </form>
+
+                <div className="border-t pt-4">
+                  <h4 className="font-serif font-bold text-gray-800 mb-2">💡 Consejos de Diseño Gráfico para L&V HOGAR:</h4>
+                  <ul className="list-disc list-inside space-y-1 text-gray-600">
+                    <li>Utilizá fotos de productos con fondo blanco o neutro para mantener una estética profesional y limpia.</li>
+                    <li>Asegurate de que las fotos secundarias de la galería muestren detalles o ángulos de uso del producto.</li>
+                    <li>Mantené actualizados los precios y el stock para generar confianza inmediata en tus clientes.</li>
+                  </ul>
+                </div>
               </div>
             ) : (
               /* Historial de Pedidos */
