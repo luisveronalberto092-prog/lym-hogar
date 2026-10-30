@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>L&V HOGAR</title>
+  <title>L&V HOGAR - Tienda Oficial</title>
+  
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -21,84 +22,397 @@
       "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNsZWR1YWFrbWViY25sZHFlYW9vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMyMjYxMzgsImV4cCI6MjEwODgwMjEzOH0.Wl1DsflvOJLNDCaCjdNyaGe91KpCH7zpqZGJVDOpH2s"
     );
 
-    function App() {
+    const categoriesList = ["Todos", "Hogar", "Cuidado Personal", "Electrodomésticos", "Bazar y Cocina", "Aromas y Decoración", "Accesorios"];
+    const deliveryZones = [
+      { name: "Malvinas Argentinas - 1ª Sección", price: 0 },
+      { name: "Malvinas Argentinas - 2ª Sección", price: 500 },
+      { name: "Malvinas Argentinas - 3ª Sección", price: 800 },
+      { name: "Córdoba Capital (Otras zonas)", price: 1500 }
+    ];
+
+    function CatalogApp() {
       const [products, setProducts] = useState([]);
       const [loading, setLoading] = useState(true);
+      const [cart, setCart] = useState([]);
+      const [isCartOpen, setIsCartOpen] = useState(false);
+      const [selectedCategory, setSelectedCategory] = useState('Todos');
+      const [searchQuery, setSearchQuery] = useState('');
+      
       const [selectedProduct, setSelectedProduct] = useState(null);
-      const [fullImg, setFullImg] = useState(null);
+      const [activeModalImage, setActiveModalImage] = useState('');
+      const [fullScreenImage, setFullScreenImage] = useState(null);
+      
+      const [quantities, setQuantities] = useState({});
+      const [chosenVariant, setChosenVariant] = useState({});
+
+      // Datos de checkout del cliente
+      const [fulfillmentType, setFulfillmentType] = useState('delivery');
+      const [selectedDeliveryZone, setSelectedDeliveryZone] = useState(0);
+      const [clientName, setClientName] = useState('');
+      const [clientAddress, setClientAddress] = useState('');
+      const [clientDni, setClientDni] = useState('');
+      const [preferredTime, setPreferredTime] = useState('Indistinto');
+      const [paymentMethod, setPaymentMethod] = useState('Efectivo contra entrega');
 
       useEffect(() => {
-        supabaseClient.from('productos').select('*').then(({ data }) => {
+        supabaseClient.from('productos').select('*').order('id', { ascending: false }).then(({ data }) => {
           setProducts(data || []);
           setLoading(false);
         });
       }, []);
 
+      const getCategoryIcon = (cat) => {
+        const lower = cat.toLowerCase();
+        if (lower.includes('hogar')) return 'fa-house-chimney';
+        if (lower.includes('cuidado') || lower.includes('personal')) return 'fa-spa';
+        if (lower.includes('electro')) return 'fa-bolt';
+        if (lower.includes('bazar') || lower.includes('cocina')) return 'fa-utensils';
+        if (lower.includes('aroma') || lower.includes('deco')) return 'fa-wand-magic-sparkles';
+        return 'fa-box-open';
+      };
+
+      const handleQtyChange = (productId, delta) => {
+        setQuantities(prev => {
+          const current = prev[productId] || 1;
+          const updated = current + delta;
+          return { ...prev, [productId]: updated > 0 ? updated : 1 };
+        });
+      };
+
+      const addToCart = (product) => {
+        const qtyToAdd = quantities[product.id] || 1;
+        let variantString = "";
+        if (product.variants && product.variants.trim()) {
+          const opts = product.variants.split(',').map(v => v.trim());
+          variantString = chosenVariant[product.id] || opts[0];
+        }
+
+        const cartItemId = variantString ? `${product.id}-${variantString}` : product.id;
+
+        setCart(prev => {
+          const exists = prev.find(item => item.cartItemId === cartItemId);
+          if (exists) {
+            return prev.map(item => item.cartItemId === cartItemId ? { ...item, qty: item.qty + qtyToAdd } : item);
+          }
+          return [...prev, { ...product, cartItemId, qty: qtyToAdd, selectedVariant: variantString }];
+        });
+        setIsCartOpen(true);
+      };
+
+      const getSubtotal = () => cart.reduce((sum, item) => sum + (Number(item.price) * item.qty), 0);
+      const getDeliveryCost = () => fulfillmentType === 'pickup' ? 0 : deliveryZones[selectedDeliveryZone].price;
+      const getTotal = () => getSubtotal() + getDeliveryCost();
+
+      const handleCheckoutWhatsApp = () => {
+        if (cart.length === 0) return;
+        if (!clientName.trim()) { alert('Por favor ingresá tu Nombre y Apellido.'); return; }
+        if (fulfillmentType === 'delivery' && !clientAddress.trim()) { alert('Por favor ingresá tu Dirección de entrega.'); return; }
+
+        let msg = `¡Hola L&V HOGAR! Quisiera realizar el siguiente pedido:\n\n👤 *Cliente:* ${clientName.trim()}\n`;
+        if (clientDni.trim()) msg += `🆔 *DNI:* ${clientDni.trim()}\n`;
+        
+        msg += `\n🛒 *PRODUCTOS:*\n`;
+        cart.forEach(item => {
+          const vText = item.selectedVariant ? ` [${item.selectedVariant}]` : '';
+          msg += `• ${item.title}${vText} x${item.qty} - $${(item.price * item.qty).toLocaleString('es-AR')}\n`;
+        });
+
+        msg += `\n💵 *Subtotal:* $${getSubtotal().toLocaleString('es-AR')}`;
+        if (fulfillmentType === 'delivery') {
+          const zone = deliveryZones[selectedDeliveryZone];
+          msg += `\n🚚 *Envío:* ${zone.name} ($${zone.price.toLocaleString('es-AR')})`;
+          msg += `\n📍 *Dirección:* ${clientAddress.trim()}`;
+        } else {
+          msg += `\n🏪 *Entrega:* Retiro en Local`;
+        }
+
+        msg += `\n⏰ *Horario:* ${preferredTime}`;
+        msg += `\n💳 *Pago:* ${paymentMethod}`;
+        msg += `\n\n💰 *TOTAL FINAL:* $${getTotal().toLocaleString('es-AR')}\n\n¿Me confirman la disponibilidad?`;
+
+        window.open(`https://wa.me/5493512102238?text=${encodeURIComponent(msg)}`, '_blank');
+      };
+
+      const filtered = products.filter(p => {
+        const matchesCat = selectedCategory === 'Todos' || p.category === selectedCategory;
+        const matchesSearch = p.title?.toLowerCase().includes(searchQuery.toLowerCase()) || p.description?.toLowerCase().includes(searchQuery.toLowerCase());
+        return matchesCat && matchesSearch;
+      });
+
       return (
         <div className="min-h-screen flex flex-col">
-          <header className="bg-[#1C1F1D] text-white p-4 flex justify-between items-center">
-            <h1 className="font-serif text-lg tracking-widest">L&V HOGAR</h1>
-            <a href="admin.html" className="text-xs text-[#C8B297] underline">Admin</a>
+          <div className="bg-[#768C77] text-white text-[11px] py-1.5 px-4 text-center">
+            📍 Malvinas Argentinas y Córdoba Capital | ⏰ Lun a Sáb: 9 a 20hs
+          </div>
+
+          <header className="bg-[#1C1F1D] text-white py-4 px-6 flex justify-between items-center shadow-md sticky top-0 z-40">
+            <div>
+              <h1 className="text-lg font-serif tracking-widest text-white">L&V HOGAR</h1>
+              <p className="text-[10px] text-[#C8B297] uppercase">Artículos para el hogar y cuidado personal</p>
+            </div>
+            <button 
+              onClick={() => setIsCartOpen(true)}
+              className="bg-[#768C77] text-white px-4 py-2 rounded-full text-xs font-medium flex items-center gap-2 shadow"
+            >
+              <i className="fa-solid fa-bag-shopping"></i> Carrito ({cart.reduce((s, i) => s + i.qty, 0)})
+            </button>
           </header>
 
-          <main className="max-w-6xl mx-auto p-4 flex-grow w-full">
-            <h2 className="text-sm font-bold uppercase text-gray-500 mb-4">Catálogo de Productos</h2>
+          <main className="max-w-7xl mx-auto px-4 py-8 flex-grow w-full">
+            {/* Categorías y Buscador */}
+            <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-8">
+              <div className="flex gap-2 overflow-x-auto w-full pb-2">
+                {categoriesList.map(cat => (
+                  <button
+                    key={cat}
+                    onClick={() => setSelectedCategory(cat)}
+                    className={`px-4 py-2 rounded-2xl text-xs font-semibold whitespace-nowrap flex items-center gap-2 transition ${
+                      selectedCategory === cat ? 'bg-[#768C77] text-white shadow' : 'bg-white border text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    <i className={`fa-solid ${cat === 'Todos' ? 'fa-border-all' : getCategoryIcon(cat)}`}></i> {cat}
+                  </button>
+                ))}
+              </div>
+              <input 
+                type="text" 
+                placeholder="Buscar producto..." 
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                className="w-full md:w-64 p-2.5 bg-white border rounded-full text-xs shadow-xs"
+              />
+            </div>
 
             {loading ? (
-              <p className="text-center py-10 text-gray-400">Cargando...</p>
-            ) : products.length === 0 ? (
-              <p className="text-center py-10 text-gray-400">No hay productos cargados.</p>
+              <div className="text-center py-20 text-gray-400">Cargando catálogo...</div>
+            ) : filtered.length === 0 ? (
+              <div className="text-center py-20 text-gray-400">No se encontraron productos.</div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-                {products.map(p => (
-                  <div key={p.id} className="bg-white rounded-xl shadow border p-3 flex flex-col justify-between">
-                    <div>
-                      <div 
-                        className="h-48 bg-gray-100 rounded-lg overflow-hidden cursor-pointer relative"
-                        onClick={() => setSelectedProduct(p)}
-                      >
-                        <img src={p.image} className="w-full h-full object-cover" />
-                        <span className="absolute bottom-2 right-2 bg-black/60 text-white text-[10px] px-2 py-1 rounded">Ver Detalle</span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                {filtered.map(p => {
+                  const isAvailable = Number(p.stock) > 0;
+                  const currentQty = quantities[p.id] || 1;
+                  const variants = p.variants ? p.variants.split(',').map(v => v.trim()) : [];
+                  const activeVar = chosenVariant[p.id] || variants[0];
+
+                  return (
+                    <div key={p.id} className="bg-white rounded-2xl shadow-sm border overflow-hidden flex flex-col justify-between">
+                      <div>
+                        <div 
+                          className="h-52 bg-gray-100 relative cursor-pointer group"
+                          onClick={() => { setSelectedProduct(p); setActiveModalImage(p.image); }}
+                        >
+                          <img src={p.image || 'https://images.unsplash.com/photo-1583847268964-b28dc8f51f92?auto=format&fit=crop&w=600&q=80'} className="w-full h-full object-cover group-hover:scale-105 transition" />
+                          <span className={`absolute top-3 right-3 text-[10px] font-bold px-2.5 py-1 rounded-full shadow ${isAvailable ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}`}>
+                            {isAvailable ? 'Disponible' : 'Agotado'}
+                          </span>
+                        </div>
+                        <div className="p-5">
+                          <span className="text-[10px] font-semibold text-[#768C77] uppercase">{p.category}</span>
+                          <h3 className="font-serif text-base text-gray-800 mt-1 cursor-pointer hover:underline" onClick={() => { setSelectedProduct(p); setActiveModalImage(p.image); }}>{p.title}</h3>
+                          <p className="text-gray-500 text-xs mt-2 line-clamp-2">{p.description}</p>
+                        </div>
                       </div>
-                      <h3 className="font-serif font-bold mt-2 text-sm">{p.title}</h3>
-                      <p className="text-xs text-gray-500 line-clamp-2">{p.description}</p>
+
+                      <div className="p-5 pt-0 space-y-3">
+                        <div className="flex justify-between items-center">
+                          <span className="text-lg font-serif font-bold text-[#768C77]">${Number(p.price).toLocaleString('es-AR')}</span>
+                          <button onClick={() => { setSelectedProduct(p); setActiveModalImage(p.image); }} className="text-xs text-gray-500 underline">Ver detalle</button>
+                        </div>
+
+                        {variants.length > 0 && (
+                          <select 
+                            value={activeVar} 
+                            onChange={e => setChosenVariant({...chosenVariant, [p.id]: e.target.value})}
+                            className="w-full p-1.5 bg-gray-50 border rounded-lg text-xs"
+                          >
+                            {variants.map((v, i) => <option key={i} value={v}>{v}</option>)}
+                          </select>
+                        )}
+
+                        {isAvailable ? (
+                          <div className="flex items-center justify-between bg-gray-100 p-1 rounded-xl border">
+                            <div className="flex items-center gap-2 px-2">
+                              <button onClick={() => handleQtyChange(p.id, -1)} className="w-6 h-6 bg-white rounded font-bold">-</button>
+                              <span className="text-xs font-bold w-4 text-center">{currentQty}</span>
+                              <button onClick={() => handleQtyChange(p.id, 1)} className="w-6 h-6 bg-white rounded font-bold">+</button>
+                            </div>
+                            <button onClick={() => addToCart(p)} className="bg-[#768C77] text-white px-3 py-1.5 rounded-lg text-xs font-medium shadow-xs">Agregar</button>
+                          </div>
+                        ) : (
+                          <button disabled className="w-full bg-gray-200 text-gray-400 py-2 rounded-xl text-xs cursor-not-allowed">Agotado</button>
+                        )}
+                      </div>
                     </div>
-                    <div className="mt-4 flex justify-between items-center">
-                      <span className="font-bold text-[#768C77]">${Number(p.price).toLocaleString('es-AR')}</span>
-                      <button onClick={() => setSelectedProduct(p)} className="bg-[#768C77] text-white text-xs px-3 py-1.5 rounded-lg">Ver</button>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </main>
 
-          {/* Modal Detalle */}
+          {/* Modal Detalle + Galería + Video + Pantalla Completa */}
           {selectedProduct && (
-            <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
-              <div className="bg-white rounded-2xl max-w-lg w-full p-6 relative max-h-[90vh] overflow-y-auto">
-                <button onClick={() => setSelectedProduct(null)} className="absolute top-4 right-4 text-gray-400 hover:text-black"><i className="fa-solid fa-xmark text-lg"></i></button>
-                <div className="h-64 bg-black rounded-lg overflow-hidden cursor-pointer flex items-center justify-center mb-4" onClick={() => setFullImg(selectedProduct.image)}>
-                  <img src={selectedProduct.image} className="max-h-full max-w-full object-contain" />
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 overflow-y-auto backdrop-blur-xs">
+              <div className="bg-white rounded-2xl max-w-2xl w-full overflow-hidden shadow-2xl my-auto flex flex-col md:flex-row">
+                <div className="w-full md:w-1/2 bg-black p-4 flex flex-col justify-center items-center relative">
+                  <div className="h-64 sm:h-80 w-full flex items-center justify-center cursor-zoom-in" onClick={() => setFullScreenImage(activeModalImage || selectedProduct.image)}>
+                    <img src={activeModalImage || selectedProduct.image} className="max-h-full max-w-full object-contain" />
+                    <span className="absolute bottom-2 right-2 bg-black/70 text-white text-[10px] px-2 py-1 rounded">Ver gigante</span>
+                  </div>
+
+                  {selectedProduct.gallery && selectedProduct.gallery.length > 0 && (
+                    <div className="flex gap-2 mt-3 overflow-x-auto w-full pb-1">
+                      <img src={selectedProduct.image} onClick={() => setActiveModalImage(selectedProduct.image)} className={`w-12 h-12 object-cover rounded cursor-pointer border ${activeModalImage === selectedProduct.image ? 'border-[#768C77]' : 'border-transparent'}`} />
+                      {selectedProduct.gallery.map((img, idx) => (
+                        <img key={idx} src={img} onClick={() => setActiveModalImage(img)} className={`w-12 h-12 object-cover rounded cursor-pointer border ${activeModalImage === img ? 'border-[#768C77]' : 'border-transparent'}`} />
+                      ))}
+                    </div>
+                  )}
+
+                  {selectedProduct.video && (
+                    <video src={selectedProduct.video} controls className="w-full h-28 object-cover rounded mt-3 bg-black"></video>
+                  )}
                 </div>
-                <h3 className="font-serif text-xl font-bold">{selectedProduct.title}</h3>
-                <p className="text-lg font-bold text-[#768C77] mt-1">${Number(selectedProduct.price).toLocaleString('es-AR')}</p>
-                <p className="text-xs text-gray-600 mt-3">{selectedProduct.description}</p>
+
+                <div className="w-full md:w-1/2 p-6 flex flex-col justify-between bg-white">
+                  <div>
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <span className="text-[10px] font-semibold text-[#768C77] uppercase">{selectedProduct.category}</span>
+                        <h3 className="text-xl font-serif font-bold text-gray-800 mt-1">{selectedProduct.title}</h3>
+                      </div>
+                      <button onClick={() => setSelectedProduct(null)} className="text-gray-400 hover:text-black"><i className="fa-solid fa-xmark text-lg"></i></button>
+                    </div>
+                    <p className="text-2xl font-serif font-bold text-[#768C77] mt-3">${Number(selectedProduct.price).toLocaleString('es-AR')}</p>
+                    <p className="text-xs text-gray-600 mt-4 leading-relaxed">{selectedProduct.description}</p>
+                  </div>
+
+                  <div className="mt-6 pt-4 border-t">
+                    <button onClick={() => { addToCart(selectedProduct); setSelectedProduct(null); }} className="w-full bg-[#768C77] text-white py-3 rounded-xl text-xs font-medium shadow">
+                      Agregar al Carrito
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           )}
 
-          {/* Pantalla Completa */}
-          {fullImg && (
-            <div className="fixed inset-0 bg-black/95 flex items-center justify-center p-4 z-50 cursor-zoom-out" onClick={() => setFullImg(null)}>
-              <img src={fullImg} className="max-h-full max-w-full object-contain rounded" />
+          {/* Visor Pantalla Completa */}
+          {fullScreenImage && (
+            <div className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center p-4 cursor-zoom-out" onClick={() => setFullScreenImage(null)}>
+              <button onClick={() => setFullScreenImage(null)} className="absolute top-4 right-4 text-white bg-white/20 w-10 h-10 rounded-full flex items-center justify-center text-xl"><i className="fa-solid fa-xmark"></i></button>
+              <img src={fullScreenImage} className="max-h-full max-w-full object-contain rounded" />
             </div>
           )}
+
+          {/* Carrito Lateral y Formulario Completo de Datos del Cliente */}
+          {isCartOpen && (
+            <div className="fixed inset-0 z-50 flex justify-end bg-black/40">
+              <div className="bg-white w-full max-w-md h-full flex flex-col justify-between shadow-2xl p-6 overflow-y-auto">
+                <div>
+                  <div className="flex justify-between items-center pb-4 border-b">
+                    <h3 className="font-serif text-lg text-gray-800">Tu Pedido</h3>
+                    <button onClick={() => setIsCartOpen(false)} className="text-gray-400 hover:text-black"><i className="fa-solid fa-xmark text-lg"></i></button>
+                  </div>
+
+                  {cart.length === 0 ? (
+                    <div className="text-center py-12 text-gray-400 text-xs">Tu carrito está vacío.</div>
+                  ) : (
+                    <div className="divide-y my-4 max-h-40 overflow-y-auto">
+                      {cart.map(item => (
+                        <div key={item.cartItemId} className="py-3 flex items-center justify-between text-xs">
+                          <div className="flex items-center gap-3">
+                            <img src={item.image} className="w-10 h-10 object-cover rounded border" />
+                            <div>
+                              <p className="font-bold">{item.title} {item.selectedVariant ? `(${item.selectedVariant})` : ''}</p>
+                              <p className="text-gray-500">${Number(item.price).toLocaleString('es-AR')} x {item.qty}</p>
+                            </div>
+                          </div>
+                          <button onClick={() => setCart(cart.filter(i => i.cartItemId !== item.cartItemId))} className="text-red-400"><i className="fa-solid fa-trash-can"></i></button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {cart.length > 0 && (
+                  <div className="border-t pt-3 space-y-2.5 text-xs">
+                    <div>
+                      <label className="block font-semibold mb-1">Nombre y Apellido: <span className="text-red-500">*</span></label>
+                      <input type="text" placeholder="Tu nombre..." value={clientName} onChange={e => setClientName(e.target.value)} className="w-full p-2 border rounded-xl bg-gray-50" />
+                    </div>
+
+                    <div>
+                      <label className="block font-semibold mb-1">Entrega:</label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button type="button" onClick={() => setFulfillmentType('delivery')} className={`p-2 rounded-xl border text-[11px] ${fulfillmentType === 'delivery' ? 'bg-gray-100 font-bold' : ''}`}>🚚 Envío a Domicilio</button>
+                        <button type="button" onClick={() => setFulfillmentType('pickup')} className={`p-2 rounded-xl border text-[11px] ${fulfillmentType === 'pickup' ? 'bg-gray-100 font-bold' : ''}`}>🏪 Retiro en Local</button>
+                      </div>
+                    </div>
+
+                    {fulfillmentType === 'delivery' && (
+                      <>
+                        <div>
+                          <label className="block font-semibold mb-1">Zona de Envío:</label>
+                          <select value={selectedDeliveryZone} onChange={e => setSelectedDeliveryZone(Number(e.target.value))} className="w-full p-2 border rounded-xl bg-gray-50">
+                            {deliveryZones.map((z, i) => <option key={i} value={i}>{z.name} - ${z.price}</option>)}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block font-semibold mb-1">Dirección: <span className="text-red-500">*</span></label>
+                          <input type="text" placeholder="Calle, Número, Barrio..." value={clientAddress} onChange={e => setClientAddress(e.target.value)} className="w-full p-2 border rounded-xl bg-gray-50" />
+                        </div>
+                      </>
+                    )}
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block font-semibold mb-1">DNI (Opcional):</label>
+                        <input type="text" placeholder="Ej: 35123456" value={clientDni} onChange={e => setClientDni(e.target.value)} className="w-full p-2 border rounded-xl bg-gray-50" />
+                      </div>
+                      <div>
+                        <label className="block font-semibold mb-1">Horario:</label>
+                        <select value={preferredTime} onChange={e => setPreferredTime(e.target.value)} className="w-full p-2 border rounded-xl bg-gray-50">
+                          <option value="Indistinto">Indistinto</option>
+                          <option value="Mañana (9hs a 13hs)">Mañana (9hs a 13hs)</option>
+                          <option value="Tarde (14hs a 18hs)">Tarde (14hs a 18hs)</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block font-semibold mb-1">Medio de Pago:</label>
+                      <select value={paymentMethod} onChange={e => setPaymentMethod(e.target.value)} className="w-full p-2 border rounded-xl bg-gray-50">
+                        <option value="Efectivo contra entrega">Efectivo contra entrega</option>
+                        <option value="Transferencia (Alias: lvhogar.mp)">Transferencia (Alias: lvhogar.mp)</option>
+                        <option value="Mercado Pago">Mercado Pago</option>
+                      </select>
+                    </div>
+
+                    <div className="bg-gray-100 p-2.5 rounded-xl space-y-1">
+                      <div className="flex justify-between"><span>Subtotal:</span><span>${getSubtotal().toLocaleString('es-AR')}</span></div>
+                      <div className="flex justify-between"><span>Envío:</span><span>${getDeliveryCost().toLocaleString('es-AR')}</span></div>
+                      <div className="flex justify-between font-bold border-t pt-1 text-[#768C77]"><span>Total:</span><span>${getTotal().toLocaleString('es-AR')}</span></div>
+                    </div>
+
+                    <button onClick={handleCheckoutWhatsApp} className="w-full bg-[#768C77] text-white py-2.5 rounded-xl font-medium shadow flex items-center justify-center gap-2">
+                      <i className="fa-brands fa-whatsapp text-base"></i> Confirmar Pedido por WhatsApp
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          <footer className="bg-[#1C1F1D] text-gray-400 py-6 text-center text-xs mt-auto">
+            <p>© L&V HOGAR - Malvinas Argentinas y Córdoba Capital</p>
+            <a href="admin.html" className="text-gray-500 hover:text-white text-[10px] block mt-2">Acceso Administrador</a>
+          </footer>
         </div>
       );
     }
 
-    ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));
+    ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(CatalogApp));
   </script>
 </body>
 </html>
