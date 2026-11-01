@@ -31,7 +31,6 @@
     );
 
     function AdminApp() {
-      // 1. Credenciales de Seguridad
       const [authConfig, setAuthConfig] = useState(() => {
         return JSON.parse(localStorage.getItem('lv_admin_credentials')) || {
           user: 'admin',
@@ -56,10 +55,8 @@
       const [newAdminEmail, setNewAdminEmail] = useState(authConfig.email);
       const [newAdminWsp, setNewAdminWsp] = useState(authConfig.wsp);
 
-      // Pestañas del Panel: 'sales', 'inventory', 'categories', 'design', 'security'
       const [activeTab, setActiveTab] = useState('sales');
 
-      // 2. Historial de Ventas / Pedidos
       const [orderHistory, setOrderHistory] = useState(() => {
         return JSON.parse(localStorage.getItem('lv_order_history')) || [
           {
@@ -82,7 +79,6 @@
 
       const [selectedReceipt, setSelectedReceipt] = useState(null);
 
-      // 3. Categorías / Pestañas de la Tienda
       const [categoriesList, setCategoriesList] = useState(() => {
         return JSON.parse(localStorage.getItem('lv_store_categories')) || [
           "Hogar", "Cuidado Personal", "Electrodomésticos", "Bazar y Cocina", "Aromas y Decoración", "Accesorios"
@@ -90,7 +86,6 @@
       });
       const [newCategoryName, setNewCategoryName] = useState('');
 
-      // 4. Calibración de Diseño Visual y Logo de Fondo
       const [storeConfig, setStoreConfig] = useState(() => {
         return JSON.parse(localStorage.getItem('lv_store_design')) || {
           brandColor: '#768C77',
@@ -102,7 +97,6 @@
         };
       });
 
-      // 5. Inventario de Productos
       const [products, setProducts] = useState([]);
       const [loading, setLoading] = useState(true);
       const [editingId, setEditingId] = useState(null);
@@ -131,7 +125,6 @@
         }
       }, [isAuth]);
 
-      // Manejo de Archivos Locales (Imágenes y Videos)
       const handleFileSelection = (e, type) => {
         const files = Array.from(e.target.files);
         if (files.length === 0) return;
@@ -157,7 +150,6 @@
         }
       };
 
-      // Autenticación y Recuperación
       const handleLogin = e => {
         e.preventDefault();
         if (user.trim() === authConfig.user && pass.trim() === authConfig.pass) {
@@ -203,7 +195,6 @@
         setTimeout(() => setMsg(''), 3000);
       };
 
-      // Gestión de Pestañas / Categorías
       const handleAddCategory = e => {
         e.preventDefault();
         if (!newCategoryName.trim()) return;
@@ -232,7 +223,6 @@
         setTimeout(() => setMsg(''), 3000);
       };
 
-      // Control de Ventas
       const handleUpdateOrderStatus = (orderId, newStatus) => {
         const updated = orderHistory.map(ord => ord.id === orderId ? { ...ord, status: newStatus } : ord);
         setOrderHistory(updated);
@@ -248,7 +238,7 @@
         localStorage.setItem('lv_order_history', JSON.stringify(updated));
       };
 
-      // Guardar / Editar Producto en Supabase
+      // GUARDAR / ACTUALIZAR PRODUCTO (Corregido y optimizado)
       const handleSave = async e => {
         e.preventDefault();
         try {
@@ -269,18 +259,18 @@
           if (editingId) {
             const { error } = await supabaseClient.from('productos').update(payload).eq('id', editingId);
             if (error) throw error;
-            setMsg('¡Producto actualizado con éxito!');
+            setMsg('¡Producto actualizado con éxito en Supabase!');
           } else {
             const { error } = await supabaseClient.from('productos').insert([payload]);
             if (error) throw error;
-            setMsg('¡Producto guardado con éxito!');
+            setMsg('¡Producto guardado con éxito en Supabase!');
           }
 
           resetForm();
           fetchProducts();
           setTimeout(() => setMsg(''), 3000);
         } catch (err) {
-          alert('Error: ' + err.message);
+          alert('Error al guardar: ' + err.message);
         }
       };
 
@@ -411,7 +401,6 @@
           <main className="max-w-6xl mx-auto p-6 w-full flex-grow space-y-6 no-print">
             {msg && <div className="p-3 bg-emerald-50 text-emerald-800 text-xs rounded-xl font-medium">{msg}</div>}
 
-            {/* Tarjetas de Métricas */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
               <div className="bg-white p-4 rounded-2xl border shadow-sm flex items-center justify-between">
                 <div>
@@ -438,7 +427,6 @@
               </div>
             </div>
 
-            {/* Pestañas Principales */}
             <div className="flex gap-2 border-b pb-2 overflow-x-auto">
               <button onClick={() => setActiveTab('sales')} className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap ${activeTab === 'sales' ? 'bg-[#768C77] text-white' : 'bg-white border text-gray-700'}`}>📊 Ventas & Comprobantes</button>
               <button onClick={() => setActiveTab('inventory')} className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap ${activeTab === 'inventory' ? 'bg-[#768C77] text-white' : 'bg-white border text-gray-700'}`}>📦 Inventario Productos</button>
@@ -447,7 +435,6 @@
               <button onClick={() => setActiveTab('security')} className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap ${activeTab === 'security' ? 'bg-[#768C77] text-white' : 'bg-white border text-gray-700'}`}>🔐 Seguridad & Claves</button>
             </div>
 
-            {/* 1. SECCIÓN: CONTROL DE VENTAS Y COMPROBANTES */}
             {activeTab === 'sales' && (
               <div className="bg-white p-5 rounded-2xl border space-y-4 text-xs">
                 <div className="flex justify-between items-center">
@@ -509,7 +496,6 @@
               </div>
             )}
 
-            {/* 2. SECCIÓN: INVENTARIO DE PRODUCTOS */}
             {activeTab === 'inventory' && (
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="bg-white p-5 rounded-2xl border space-y-3 text-xs">
@@ -637,7 +623,6 @@
               </div>
             )}
 
-            {/* 3. SECCIÓN: GESTIONAR PESTAÑAS / CATEGORÍAS */}
             {activeTab === 'categories' && (
               <div className="bg-white p-6 rounded-2xl border space-y-6 text-xs max-w-xl">
                 <div>
@@ -677,7 +662,6 @@
               </div>
             )}
 
-            {/* 4. SECCIÓN: DISEÑO & CALIBRADOR DE LOGO DE FONDO */}
             {activeTab === 'design' && (
               <div className="bg-white p-6 rounded-2xl border space-y-6 text-xs">
                 <div>
@@ -730,7 +714,6 @@
               </div>
             )}
 
-            {/* 5. SECCIÓN: SEGURIDAD Y CREDENCIALES */}
             {activeTab === 'security' && (
               <div className="bg-white p-6 rounded-2xl border space-y-6 text-xs max-w-xl">
                 <div>
@@ -775,7 +758,6 @@
             )}
           </main>
 
-          {/* MODAL / COMPROBANTE DE COMPRA IMPRIMIBLE */}
           {selectedReceipt && (
             <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4 overflow-y-auto">
               <div className="bg-white max-w-md w-full p-6 rounded-2xl shadow-2xl relative space-y-4" id="printable-receipt">
@@ -862,7 +844,7 @@
       );
     }
 
-    ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(AdminApp));
+    ReactDOM.createRoot(getElementById('root')).render(React.createElement(AdminApp));
   </script>
 </body>
 </html>
