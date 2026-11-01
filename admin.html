@@ -19,13 +19,10 @@
     const { useState, useEffect } = React;
     const supabaseClient = supabase.createClient(
       "https://cleduaakmebcnldqeaoo.supabase.co",
-      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNsZWR1YWFrbWViY25sZHFlYW9vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMyMjYxMzgsImV4cCI6MjEwODgwMjEzOH0.Wl1DsflvOJLNDCaCjdNyaGe91KpCH7zpqZGJVDOpH2s"
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNsZWR1YWFrbWViY25sZHFlYW9vIiwicm9sZSI6ImFub24iOjE3OTMyMjYxMzgsImV4cCI6MjEwODgwMjEzOH0.Wl1DsflvOJLNDCaCjdNyaGe91KpCH7zpqZGJVDOpH2s"
     );
 
-    const categoriesList = ["Hogar", "Cuidado Personal", "Electrodomésticos", "Bazar y Cocina", "Aromas y Decoración", "Accesorios"];
-
     function AdminApp() {
-      // Credenciales guardadas dinámicamente en localStorage (Valores iniciales: admin / admin123)
       const [authConfig, setAuthConfig] = useState(() => {
         return JSON.parse(localStorage.getItem('lv_admin_credentials')) || {
           user: 'admin',
@@ -40,13 +37,11 @@
       const [pass, setPass] = useState('');
       const [error, setError] = useState('');
       
-      // Estado para la recuperación de contraseña
       const [isRecovering, setIsRecovering] = useState(false);
-      const [recoveryMethod, setRecoveryMethod] = useState('wsp'); // 'wsp' o 'email'
+      const [recoveryMethod, setRecoveryMethod] = useState('wsp');
       const [recoveryInput, setRecoveryInput] = useState('');
       const [recoveryMsg, setRecoveryMsg] = useState('');
 
-      // Formulario de cambio de credenciales dentro del panel
       const [newAdminUser, setNewAdminUser] = useState(authConfig.user);
       const [newAdminPass, setNewAdminPass] = useState(authConfig.pass);
       const [newAdminEmail, setNewAdminEmail] = useState(authConfig.email);
@@ -58,6 +53,14 @@
       const [loading, setLoading] = useState(true);
       const [editingId, setEditingId] = useState(null);
       const [msg, setMsg] = useState('');
+
+      // Categorías / Pestañas configurables guardadas en localStorage
+      const [categoriesList, setCategoriesList] = useState(() => {
+        return JSON.parse(localStorage.getItem('lv_store_categories')) || [
+          "Hogar", "Cuidado Personal", "Electrodomésticos", "Bazar y Cocina", "Aromas y Decoración", "Accesorios"
+        ];
+      });
+      const [newCategoryName, setNewCategoryName] = useState('');
 
       const [storeConfig, setStoreConfig] = useState(() => {
         return JSON.parse(localStorage.getItem('lv_store_design')) || {
@@ -71,7 +74,7 @@
       });
 
       const [form, setForm] = useState({
-        title: '', price: '', stock: '10', category: 'Hogar', image: '', video: '', description: '', variants: '', colors: '', specifications: ''
+        title: '', price: '', stock: '10', category: categoriesList[0] || 'Hogar', image: '', video: '', description: '', variants: '', colors: '', specifications: ''
       });
       const [additionalImages, setAdditionalImages] = useState([]);
 
@@ -130,7 +133,6 @@
         }
       };
 
-      // Proceso de recuperación vía WhatsApp o Email
       const handleRecovery = e => {
         e.preventDefault();
         const inputClean = recoveryInput.trim().toLowerCase();
@@ -152,7 +154,6 @@
         }
       };
 
-      // Guardar nuevo Usuario y Contraseña
       const handleUpdateCredentials = e => {
         e.preventDefault();
         const updated = {
@@ -163,7 +164,36 @@
         };
         setAuthConfig(updated);
         localStorage.setItem('lv_admin_credentials', JSON.stringify(updated));
-        setMsg('¡Credenciales de acceso actualizadas con éxito!');
+        setMsg('¡Credenciales actualizadas con éxito!');
+        setTimeout(() => setMsg(''), 3000);
+      };
+
+      // Funciones de Pestañas / Categorías
+      const handleAddCategory = e => {
+        e.preventDefault();
+        if (!newCategoryName.trim()) return;
+        if (categoriesList.includes(newCategoryName.trim())) {
+          alert('Esa categoría ya existe.');
+          return;
+        }
+        const updated = [...categoriesList, newCategoryName.trim()];
+        setCategoriesList(updated);
+        localStorage.setItem('lv_store_categories', JSON.stringify(updated));
+        setNewCategoryName('');
+        setMsg('¡Categoría agregada con éxito!');
+        setTimeout(() => setMsg(''), 3000);
+      };
+
+      const handleDeleteCategory = (catToDelete) => {
+        if (categoriesList.length <= 1) {
+          alert('Debes mantener al menos una categoría.');
+          return;
+        }
+        if (!confirm(`¿Estás seguro de eliminar la categoría "${catToDelete}"?`)) return;
+        const updated = categoriesList.filter(c => c !== catToDelete);
+        setCategoriesList(updated);
+        localStorage.setItem('lv_store_categories', JSON.stringify(updated));
+        setMsg('Categoría eliminada.');
         setTimeout(() => setMsg(''), 3000);
       };
 
@@ -208,7 +238,7 @@
           title: p.title || '',
           price: p.price || '',
           stock: p.stock || 10,
-          category: p.category || 'Hogar',
+          category: p.category || categoriesList[0],
           image: p.image || '',
           video: p.video || '',
           description: p.description || '',
@@ -233,7 +263,7 @@
 
       const resetForm = () => {
         setEditingId(null);
-        setForm({ title: '', price: '', stock: '10', category: 'Hogar', image: '', video: '', description: '', variants: '', colors: '', specifications: '' });
+        setForm({ title: '', price: '', stock: '10', category: categoriesList[0], image: '', video: '', description: '', variants: '', colors: '', specifications: '' });
         setAdditionalImages([]);
       };
 
@@ -356,9 +386,10 @@
 
             <div className="flex gap-2 border-b pb-2 overflow-x-auto">
               <button onClick={() => setActiveTab('inventory')} className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap ${activeTab === 'inventory' ? 'bg-[#768C77] text-white' : 'bg-white border text-gray-700'}`}>📦 Inventario</button>
+              <button onClick={() => setActiveTab('categories')} className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap ${activeTab === 'categories' ? 'bg-[#768C77] text-white' : 'bg-white border text-gray-700'}`}>🏷️ Gestionar Pestañas</button>
               <button onClick={() => setActiveTab('design')} className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap ${activeTab === 'design' ? 'bg-[#768C77] text-white' : 'bg-white border text-gray-700'}`}>🎨 Diseño & Fondo</button>
-              <button onClick={() => setActiveTab('security')} className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap ${activeTab === 'security' ? 'bg-[#768C77] text-white' : 'bg-white border text-gray-700'}`}>🔐 Seguridad & Claves</button>
-              <button onClick={() => setActiveTab('history')} className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap ${activeTab === 'history' ? 'bg-[#768C77] text-white' : 'bg-white border text-gray-700'}`}>📋 Historial de Pedidos ({orderHistory.length})</button>
+              <button onClick={() => setActiveTab('security')} className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap ${activeTab === 'security' ? 'bg-[#768C77] text-white' : 'bg-white border text-gray-700'}`}>🔐 Seguridad</button>
+              <button onClick={() => setActiveTab('history')} className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap ${activeTab === 'history' ? 'bg-[#768C77] text-white' : 'bg-white border text-gray-700'}`}>📋 Pedidos ({orderHistory.length})</button>
             </div>
 
             {activeTab === 'inventory' ? (
@@ -379,7 +410,7 @@
 
                     <div className="grid grid-cols-2 gap-2">
                       <div>
-                        <label className="block font-medium mb-1">Categoría</label>
+                        <label className="block font-medium mb-1">Categoría / Pestaña</label>
                         <select value={form.category} onChange={e => setForm({...form, category: e.target.value})} className="w-full p-2 border rounded-xl bg-gray-50">
                           {categoriesList.map(c => <option key={c} value={c}>{c}</option>)}
                         </select>
@@ -490,6 +521,44 @@
                 </div>
 
               </div>
+            ) : activeTab === 'categories' ? (
+              /* PESTAÑA PARA GESTIONAR PESTAÑAS / CATEGORÍAS */
+              <div className="bg-white p-6 rounded-2xl border space-y-6 text-xs max-w-xl">
+                <div>
+                  <h3 className="font-serif font-bold text-sm text-gray-800 flex items-center gap-2">
+                    <i className="fa-solid fa-tags text-[#768C77]"></i> Gestor de Pestañas y Categorías
+                  </h3>
+                  <p className="text-gray-500 mt-1">Agregá nuevas pestañas o eliminá las que ya no uses en tu tienda.</p>
+                </div>
+
+                <form onSubmit={handleAddCategory} className="flex gap-2">
+                  <input 
+                    type="text" 
+                    placeholder="Nombre de nueva categoría..." 
+                    value={newCategoryName} 
+                    onChange={e => setNewCategoryName(e.target.value)} 
+                    className="flex-grow p-2.5 border rounded-xl bg-gray-50 text-xs" 
+                    required 
+                  />
+                  <button type="submit" className="bg-[#768C77] text-white px-5 py-2.5 rounded-xl font-medium shadow">
+                    Agregar Pestaña
+                  </button>
+                </form>
+
+                <div className="space-y-2 pt-2">
+                  <p className="font-semibold text-gray-700">Pestañas Actuales en la Tienda:</p>
+                  <div className="divide-y border rounded-xl overflow-hidden bg-gray-50">
+                    {categoriesList.map((cat, idx) => (
+                      <div key={idx} className="p-3 flex items-center justify-between bg-white">
+                        <span className="font-semibold text-gray-800"><i className="fa-solid fa-tag text-[#768C77] mr-2"></i>{cat}</span>
+                        <button onClick={() => handleDeleteCategory(cat)} className="text-red-400 hover:text-red-600 p-1" title="Eliminar categoría">
+                          <i className="fa-solid fa-trash-can"></i>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
             ) : activeTab === 'design' ? (
               <div className="bg-white p-6 rounded-2xl border space-y-6 text-xs">
                 <div>
@@ -541,11 +610,10 @@
                 </form>
               </div>
             ) : activeTab === 'security' ? (
-              /* PESTAÑA DE CONFIGURACIÓN DE SEGURIDAD Y CLAVES */
               <div className="bg-white p-6 rounded-2xl border space-y-6 text-xs max-w-xl">
                 <div>
                   <h3 className="font-serif font-bold text-sm text-gray-800 flex items-center gap-2">
-                    <i className="fa-solid fa-[#768C77] fa-key"></i> Configuración de Credenciales de Acceso
+                    <i className="fa-solid fa-key text-[#768C77]"></i> Configuración de Credenciales de Acceso
                   </h3>
                   <p className="text-gray-500 mt-1">Cambiá tu usuario, tu contraseña y configurá tus canales de recuperación.</p>
                 </div>
