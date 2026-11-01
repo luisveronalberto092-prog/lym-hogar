@@ -31,7 +31,7 @@
     );
 
     function AdminApp() {
-      // Credenciales
+      // 1. Credenciales de Seguridad
       const [authConfig, setAuthConfig] = useState(() => {
         return JSON.parse(localStorage.getItem('lv_admin_credentials')) || {
           user: 'admin',
@@ -46,33 +46,43 @@
       const [pass, setPass] = useState('');
       const [error, setError] = useState('');
       
-      // Recuperación
       const [isRecovering, setIsRecovering] = useState(false);
       const [recoveryMethod, setRecoveryMethod] = useState('wsp');
       const [recoveryInput, setRecoveryInput] = useState('');
       const [recoveryMsg, setRecoveryMsg] = useState('');
 
-      // Formularios de seguridad
       const [newAdminUser, setNewAdminUser] = useState(authConfig.user);
       const [newAdminPass, setNewAdminPass] = useState(authConfig.pass);
       const [newAdminEmail, setNewAdminEmail] = useState(authConfig.email);
       const [newAdminWsp, setNewAdminWsp] = useState(authConfig.wsp);
 
-      // Pestañas del admin
+      // Pestañas del Panel: 'sales', 'inventory', 'categories', 'design', 'security'
       const [activeTab, setActiveTab] = useState('sales');
-      const [products, setProducts] = useState([]);
+
+      // 2. Historial de Ventas / Pedidos
       const [orderHistory, setOrderHistory] = useState(() => {
-        return JSON.parse(localStorage.getItem('lv_order_history')) || [];
+        return JSON.parse(localStorage.getItem('lv_order_history')) || [
+          {
+            id: 'LV-1001',
+            date: new Date().toLocaleDateString('es-AR'),
+            clientName: 'Cliente Ejemplo',
+            clientAddress: 'Malvinas Argentinas 1ra Sección',
+            clientPhone: '3512102238',
+            paymentMethod: 'Efectivo contra entrega',
+            fulfillmentType: 'delivery',
+            deliveryCost: 0,
+            status: 'Entregado',
+            total: 12500,
+            items: [
+              { title: 'Humidificador Ultrasónico', qty: 1, price: 12500, selectedOptions: 'Blanco' }
+            ]
+          }
+        ];
       });
 
-      const [loading, setLoading] = useState(true);
-      const [editingId, setEditingId] = useState(null);
-      const [msg, setMsg] = useState('');
-
-      // Comprobante activo
       const [selectedReceipt, setSelectedReceipt] = useState(null);
 
-      // Categorías dinámicas
+      // 3. Categorías / Pestañas de la Tienda
       const [categoriesList, setCategoriesList] = useState(() => {
         return JSON.parse(localStorage.getItem('lv_store_categories')) || [
           "Hogar", "Cuidado Personal", "Electrodomésticos", "Bazar y Cocina", "Aromas y Decoración", "Accesorios"
@@ -80,7 +90,7 @@
       });
       const [newCategoryName, setNewCategoryName] = useState('');
 
-      // Configuración de diseño
+      // 4. Calibración de Diseño Visual y Logo de Fondo
       const [storeConfig, setStoreConfig] = useState(() => {
         return JSON.parse(localStorage.getItem('lv_store_design')) || {
           brandColor: '#768C77',
@@ -92,7 +102,12 @@
         };
       });
 
-      // Formulario de inventario
+      // 5. Inventario de Productos
+      const [products, setProducts] = useState([]);
+      const [loading, setLoading] = useState(true);
+      const [editingId, setEditingId] = useState(null);
+      const [msg, setMsg] = useState('');
+
       const [form, setForm] = useState({
         title: '', price: '', stock: '10', category: categoriesList[0] || 'Hogar', image: '', video: '', description: '', variants: '', colors: '', specifications: ''
       });
@@ -116,6 +131,7 @@
         }
       }, [isAuth]);
 
+      // Manejo de Archivos Locales (Imágenes y Videos)
       const handleFileSelection = (e, type) => {
         const files = Array.from(e.target.files);
         if (files.length === 0) return;
@@ -141,6 +157,7 @@
         }
       };
 
+      // Autenticación y Recuperación
       const handleLogin = e => {
         e.preventDefault();
         if (user.trim() === authConfig.user && pass.trim() === authConfig.pass) {
@@ -154,6 +171,7 @@
       const handleRecovery = e => {
         e.preventDefault();
         const inputClean = recoveryInput.trim().toLowerCase();
+
         if (recoveryMethod === 'wsp') {
           if (inputClean.includes(authConfig.wsp) || authConfig.wsp.includes(inputClean)) {
             const wspMessage = `¡Hola Luis! Solicitaste la recuperación de acceso a L&V HOGAR.\n\n👤 *Usuario:* ${authConfig.user}\n🔑 *Contraseña:* ${authConfig.pass}`;
@@ -164,7 +182,7 @@
           }
         } else {
           if (inputClean === authConfig.email.toLowerCase()) {
-            setRecoveryMsg(`✅ Acceso para tu mail: ${authConfig.email}\nUsuario: ${authConfig.user}\nContraseña: ${authConfig.pass}`);
+            setRecoveryMsg(`✅ Clave de acceso enviada a: ${authConfig.email}.\nUsuario: ${authConfig.user}\nContraseña: ${authConfig.pass}`);
           } else {
             setRecoveryMsg('❌ El correo ingresado no coincide con el registrado.');
           }
@@ -181,30 +199,40 @@
         };
         setAuthConfig(updated);
         localStorage.setItem('lv_admin_credentials', JSON.stringify(updated));
-        setMsg('¡Credenciales de seguridad actualizadas con éxito!');
+        setMsg('¡Credenciales actualizadas con éxito!');
         setTimeout(() => setMsg(''), 3000);
       };
 
+      // Gestión de Pestañas / Categorías
       const handleAddCategory = e => {
         e.preventDefault();
         if (!newCategoryName.trim()) return;
-        if (categoriesList.includes(newCategoryName.trim())) { alert('Esa categoría ya existe.'); return; }
+        if (categoriesList.includes(newCategoryName.trim())) {
+          alert('Esa categoría ya existe.');
+          return;
+        }
         const updated = [...categoriesList, newCategoryName.trim()];
         setCategoriesList(updated);
         localStorage.setItem('lv_store_categories', JSON.stringify(updated));
         setNewCategoryName('');
-        setMsg('¡Categoría agregada!');
+        setMsg('¡Categoría agregada con éxito!');
         setTimeout(() => setMsg(''), 3000);
       };
 
       const handleDeleteCategory = (catToDelete) => {
-        if (categoriesList.length <= 1) { alert('Debes mantener al menos una categoría.'); return; }
-        if (!confirm(`¿Eliminar la categoría "${catToDelete}"?`)) return;
+        if (categoriesList.length <= 1) {
+          alert('Debes mantener al menos una categoría.');
+          return;
+        }
+        if (!confirm(`¿Estás seguro de eliminar la categoría "${catToDelete}"?`)) return;
         const updated = categoriesList.filter(c => c !== catToDelete);
         setCategoriesList(updated);
         localStorage.setItem('lv_store_categories', JSON.stringify(updated));
+        setMsg('Categoría eliminada.');
+        setTimeout(() => setMsg(''), 3000);
       };
 
+      // Control de Ventas
       const handleUpdateOrderStatus = (orderId, newStatus) => {
         const updated = orderHistory.map(ord => ord.id === orderId ? { ...ord, status: newStatus } : ord);
         setOrderHistory(updated);
@@ -220,6 +248,7 @@
         localStorage.setItem('lv_order_history', JSON.stringify(updated));
       };
 
+      // Guardar / Editar Producto en Supabase
       const handleSave = async e => {
         e.preventDefault();
         try {
@@ -294,7 +323,7 @@
       const handleSaveDesign = e => {
         e.preventDefault();
         localStorage.setItem('lv_store_design', JSON.stringify(storeConfig));
-        setMsg('¡Diseño y calibración guardados!');
+        setMsg('¡Diseño y fondo calibrado guardados con éxito!');
         setTimeout(() => setMsg(''), 3000);
       };
 
@@ -333,7 +362,7 @@
                 <>
                   <div className="text-center text-xs text-gray-600">
                     <p className="font-semibold mb-1">Recuperar Acceso</p>
-                    <p>Elegí dónde recibir tus datos:</p>
+                    <p>Elegí dónde querés recibir tus datos de ingreso:</p>
                   </div>
 
                   <div className="flex gap-2 text-xs">
@@ -346,7 +375,7 @@
                   <form onSubmit={handleRecovery} className="space-y-3">
                     <div>
                       <label className="block text-xs font-semibold mb-1">
-                        {recoveryMethod === 'wsp' ? 'Tu WhatsApp (ej: 3512102238):' : 'Tu Email:'}
+                        {recoveryMethod === 'wsp' ? 'Tu WhatsApp (ej: 3512102238):' : 'Tu Correo Electrónico:'}
                       </label>
                       <input 
                         type={recoveryMethod === 'wsp' ? 'text' : 'email'} 
@@ -358,7 +387,7 @@
                       />
                     </div>
                     <button type="submit" className="w-full bg-[#768C77] text-white py-2.5 rounded-xl text-xs font-medium shadow">
-                      Enviar Acceso
+                      Enviar Datos de Ingreso
                     </button>
                   </form>
                   <button onClick={() => { setIsRecovering(false); setRecoveryMsg(''); }} className="w-full text-xs text-gray-500 underline text-center pt-2">Volver al Login</button>
@@ -382,6 +411,7 @@
           <main className="max-w-6xl mx-auto p-6 w-full flex-grow space-y-6 no-print">
             {msg && <div className="p-3 bg-emerald-50 text-emerald-800 text-xs rounded-xl font-medium">{msg}</div>}
 
+            {/* Tarjetas de Métricas */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
               <div className="bg-white p-4 rounded-2xl border shadow-sm flex items-center justify-between">
                 <div>
@@ -408,16 +438,17 @@
               </div>
             </div>
 
-            {/* PESTAÑAS COMPLETAS UNIFICADAS */}
+            {/* Pestañas Principales */}
             <div className="flex gap-2 border-b pb-2 overflow-x-auto">
               <button onClick={() => setActiveTab('sales')} className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap ${activeTab === 'sales' ? 'bg-[#768C77] text-white' : 'bg-white border text-gray-700'}`}>📊 Ventas & Comprobantes</button>
-              <button onClick={() => setActiveTab('inventory')} className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap ${activeTab === 'inventory' ? 'bg-[#768C77] text-white' : 'bg-white border text-gray-700'}`}>📦 Inventario</button>
+              <button onClick={() => setActiveTab('inventory')} className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap ${activeTab === 'inventory' ? 'bg-[#768C77] text-white' : 'bg-white border text-gray-700'}`}>📦 Inventario Productos</button>
               <button onClick={() => setActiveTab('categories')} className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap ${activeTab === 'categories' ? 'bg-[#768C77] text-white' : 'bg-white border text-gray-700'}`}>🏷️ Pestañas</button>
-              <button onClick={() => setActiveTab('design')} className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap ${activeTab === 'design' ? 'bg-[#768C77] text-white' : 'bg-white border text-gray-700'}`}>🎨 Diseño & Fondo</button>
-              <button onClick={() => setActiveTab('security')} className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap ${activeTab === 'security' ? 'bg-[#768C77] text-white' : 'bg-white border text-gray-700'}`}>🔐 Seguridad</button>
+              <button onClick={() => setActiveTab('design')} className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap ${activeTab === 'design' ? 'bg-[#768C77] text-white' : 'bg-white border text-gray-700'}`}>🎨 Diseño & Logo Fondo</button>
+              <button onClick={() => setActiveTab('security')} className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap ${activeTab === 'security' ? 'bg-[#768C77] text-white' : 'bg-white border text-gray-700'}`}>🔐 Seguridad & Claves</button>
             </div>
 
-            {activeTab === 'sales' ? (
+            {/* 1. SECCIÓN: CONTROL DE VENTAS Y COMPROBANTES */}
+            {activeTab === 'sales' && (
               <div className="bg-white p-5 rounded-2xl border space-y-4 text-xs">
                 <div className="flex justify-between items-center">
                   <h3 className="font-serif font-bold text-sm text-gray-800">Historial de Ventas & Emisión de Comprobantes</h3>
@@ -434,7 +465,7 @@
                           <th className="p-2">ID</th>
                           <th className="p-2">Fecha</th>
                           <th className="p-2">Cliente</th>
-                          <th className="p-2">Pago</th>
+                          <th className="p-2">Método Pago</th>
                           <th className="p-2">Total</th>
                           <th className="p-2">Estado</th>
                           <th className="p-2 text-right">Comprobante / Acciones</th>
@@ -476,10 +507,17 @@
                   </div>
                 )}
               </div>
-            ) : activeTab === 'inventory' ? (
+            )}
+
+            {/* 2. SECCIÓN: INVENTARIO DE PRODUCTOS */}
+            {activeTab === 'inventory' && (
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="bg-white p-5 rounded-2xl border space-y-3 text-xs">
-                  <h3 className="font-serif font-bold text-sm">{editingId ? '✏️ Editar Producto' : '📦 Cargar Producto'}</h3>
+                  <div className="flex justify-between items-center">
+                    <h3 className="font-serif font-bold text-sm">{editingId ? '✏️ Editar Producto' : '📦 Cargar Producto'}</h3>
+                    {editingId && <button onClick={resetForm} className="text-gray-400 underline">Cancelar</button>}
+                  </div>
+
                   <form onSubmit={handleSave} className="space-y-3">
                     <div>
                       <label className="block font-medium mb-1">Título</label>
@@ -524,3 +562,307 @@
                     <div className="bg-gray-50 p-2 rounded-xl border space-y-1">
                       <label className="block font-medium text-gray-700">📸 Foto Principal:</label>
                       <input type="file" accept="image/*" onChange={e => handleFileSelection(e, 'main')} className="w-full text-[10px]" />
+                      <input type="text" placeholder="O pegá URL..." value={form.image} onChange={e => setForm({...form, image: e.target.value})} className="w-full p-1.5 border rounded bg-white text-[11px]" />
+                    </div>
+
+                    <div className="bg-gray-50 p-2 rounded-xl border space-y-1">
+                      <label className="block font-medium text-gray-700">🖼️ Galería Secundaria:</label>
+                      <input type="file" accept="image/*" multiple onChange={e => handleFileSelection(e, 'gallery')} className="w-full text-[10px]" />
+                      {additionalImages.length > 0 && (
+                        <div className="flex gap-1 mt-1 overflow-x-auto">
+                          {additionalImages.map((img, idx) => (
+                            <div key={idx} className="relative">
+                              <img src={img} className="w-10 h-10 object-cover rounded border" />
+                              <button type="button" onClick={() => setAdditionalImages(additionalImages.filter((_, i) => i !== idx))} className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-3.5 h-3.5 text-[8px] flex items-center justify-center">×</button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="bg-gray-50 p-2 rounded-xl border space-y-1">
+                      <label className="block font-medium text-gray-700">🎬 Video Demostrativo:</label>
+                      <input type="file" accept="video/*" onChange={e => handleFileSelection(e, 'video')} className="w-full text-[10px]" />
+                    </div>
+
+                    <div>
+                      <label className="block font-medium mb-1">Descripción</label>
+                      <textarea value={form.description} onChange={e => setForm({...form, description: e.target.value})} className="w-full p-2 border rounded-xl h-20 bg-gray-50"></textarea>
+                    </div>
+
+                    <button type="submit" className="w-full bg-[#768C77] text-white py-2.5 rounded-xl font-medium shadow">
+                      {editingId ? 'Actualizar Producto' : 'Guardar Producto'}
+                    </button>
+                  </form>
+                </div>
+
+                <div className="bg-white p-5 rounded-2xl border space-y-3 text-xs md:col-span-2">
+                  <h3 className="font-serif font-bold text-sm">Inventario en Supabase ({products.length})</h3>
+                  {loading ? (
+                    <p className="text-center py-10 text-gray-400">Cargando...</p>
+                  ) : products.length === 0 ? (
+                    <p className="text-center py-10 text-gray-400">No hay productos cargados todavía.</p>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left">
+                        <thead>
+                          <tr className="border-b bg-gray-50 text-gray-600">
+                            <th className="p-2">Foto</th>
+                            <th className="p-2">Título</th>
+                            <th className="p-2">Categoría</th>
+                            <th className="p-2">Precio</th>
+                            <th className="p-2">Stock</th>
+                            <th className="p-2 text-right">Acciones</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {products.map(p => (
+                            <tr key={p.id} className="border-b hover:bg-gray-50">
+                              <td className="p-2"><img src={p.image} className="w-8 h-8 object-cover rounded border" /></td>
+                              <td className="p-2 font-semibold">{p.title}</td>
+                              <td className="p-2 text-gray-500">{p.category}</td>
+                              <td className="p-2 font-bold text-[#768C77]">${Number(p.price).toLocaleString('es-AR')}</td>
+                              <td className="p-2"><span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${Number(p.stock) > 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}`}>{p.stock} un.</span></td>
+                              <td className="p-2 text-right space-x-2">
+                                <button onClick={() => handleEdit(p)} className="text-blue-500" title="Editar"><i className="fa-solid fa-pen"></i></button>
+                                <button onClick={() => handleDelete(p.id)} className="text-red-400" title="Eliminar"><i className="fa-solid fa-trash"></i></button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* 3. SECCIÓN: GESTIONAR PESTAÑAS / CATEGORÍAS */}
+            {activeTab === 'categories' && (
+              <div className="bg-white p-6 rounded-2xl border space-y-6 text-xs max-w-xl">
+                <div>
+                  <h3 className="font-serif font-bold text-sm text-gray-800 flex items-center gap-2">
+                    <i className="fa-solid fa-tags text-[#768C77]"></i> Gestor de Pestañas y Categorías
+                  </h3>
+                  <p className="text-gray-500 mt-1">Agregá nuevas pestañas o eliminá las que ya no uses en tu tienda.</p>
+                </div>
+
+                <form onSubmit={handleAddCategory} className="flex gap-2">
+                  <input 
+                    type="text" 
+                    placeholder="Nombre de nueva categoría..." 
+                    value={newCategoryName} 
+                    onChange={e => setNewCategoryName(e.target.value)} 
+                    className="flex-grow p-2.5 border rounded-xl bg-gray-50 text-xs" 
+                    required 
+                  />
+                  <button type="submit" className="bg-[#768C77] text-white px-5 py-2.5 rounded-xl font-medium shadow">
+                    Agregar Pestaña
+                  </button>
+                </form>
+
+                <div className="space-y-2 pt-2">
+                  <p className="font-semibold text-gray-700">Pestañas Actuales en la Tienda:</p>
+                  <div className="divide-y border rounded-xl overflow-hidden bg-gray-50">
+                    {categoriesList.map((cat, idx) => (
+                      <div key={idx} className="p-3 flex items-center justify-between bg-white">
+                        <span className="font-semibold text-gray-800"><i className="fa-solid fa-tag text-[#768C77] mr-2"></i>{cat}</span>
+                        <button onClick={() => handleDeleteCategory(cat)} className="text-red-400 hover:text-red-600 p-1" title="Eliminar categoría">
+                          <i className="fa-solid fa-trash-can"></i>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 4. SECCIÓN: DISEÑO & CALIBRADOR DE LOGO DE FONDO */}
+            {activeTab === 'design' && (
+              <div className="bg-white p-6 rounded-2xl border space-y-6 text-xs">
+                <div>
+                  <h3 className="font-serif font-bold text-sm text-gray-800 flex items-center gap-2">
+                    <i className="fa-solid fa-sliders text-[#768C77]"></i> Calibrador de Fondo de Pantalla (Logo de Marca)
+                  </h3>
+                  <p className="text-gray-500 mt-1">Subí tu logo y ajustá la transparencia y el tamaño para que aparezca como marca de agua en la tienda.</p>
+                </div>
+
+                <form onSubmit={handleSaveDesign} className="space-y-4 max-w-xl">
+                  <div className="bg-gray-50 p-4 rounded-2xl border space-y-2">
+                    <label className="block font-semibold text-gray-700">🖼️ Logo para Fondo de Pantalla:</label>
+                    <input type="file" accept="image/*" onChange={e => handleFileSelection(e, 'bgLogo')} className="w-full text-xs" />
+                    <input type="text" placeholder="O pegá URL de tu logo..." value={storeConfig.bgLogoUrl || ''} onChange={e => setStoreConfig({...storeConfig, bgLogoUrl: e.target.value})} className="w-full p-2 border rounded-xl bg-white text-xs" />
+                    {storeConfig.bgLogoUrl && (
+                      <div className="mt-2 p-2 bg-white rounded-xl border flex items-center gap-3">
+                        <img src={storeConfig.bgLogoUrl} className="w-12 h-12 object-contain border rounded bg-gray-100" />
+                        <span className="text-[10px] text-gray-500">Vista previa del logo cargado.</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-gray-50 p-4 rounded-2xl border">
+                    <div>
+                      <label className="block font-semibold text-gray-700 mb-1">Transparencia: ({Math.round(storeConfig.bgOpacity * 100)}%)</label>
+                      <input type="range" min="0.02" max="0.5" step="0.01" value={storeConfig.bgOpacity} onChange={e => setStoreConfig({...storeConfig, bgOpacity: parseFloat(e.target.value)})} className="w-full accent-[#768C77]" />
+                    </div>
+                    <div>
+                      <label className="block font-semibold text-gray-700 mb-1">Tamaño del Logo: ({storeConfig.bgSize}%)</label>
+                      <input type="range" min="10" max="100" step="5" value={storeConfig.bgSize} onChange={e => setStoreConfig({...storeConfig, bgSize: parseInt(e.target.value)})} className="w-full accent-[#768C77]" />
+                    </div>
+                    <div>
+                      <label className="block font-semibold text-gray-700 mb-1">Modo de Fondo:</label>
+                      <select value={storeConfig.bgRepeat} onChange={e => setStoreConfig({...storeConfig, bgRepeat: e.target.value})} className="w-full p-2 border rounded-xl bg-white text-xs">
+                        <option value="no-repeat">Centrado Fijo (Marca de agua)</option>
+                        <option value="repeat">Mosaico (Patrón Repetido)</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block font-semibold text-gray-700 mb-1">Color de Marca:</label>
+                      <div className="flex items-center gap-2">
+                        <input type="color" value={storeConfig.brandColor} onChange={e => setStoreConfig({...storeConfig, brandColor: e.target.value})} className="w-10 h-10 rounded cursor-pointer border" />
+                        <span className="font-mono text-gray-600">{storeConfig.brandColor}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <button type="submit" className="bg-[#768C77] text-white px-6 py-2.5 rounded-xl font-medium shadow">Guardar Configuración Visual</button>
+                </form>
+              </div>
+            )}
+
+            {/* 5. SECCIÓN: SEGURIDAD Y CREDENCIALES */}
+            {activeTab === 'security' && (
+              <div className="bg-white p-6 rounded-2xl border space-y-6 text-xs max-w-xl">
+                <div>
+                  <h3 className="font-serif font-bold text-sm text-gray-800 flex items-center gap-2">
+                    <i className="fa-solid fa-key text-[#768C77]"></i> Configuración de Credenciales de Acceso
+                  </h3>
+                  <p className="text-gray-500 mt-1">Cambiá tu usuario, tu contraseña y configurá tus canales de recuperación.</p>
+                </div>
+
+                <form onSubmit={handleUpdateCredentials} className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block font-semibold text-gray-700 mb-1">Nuevo Usuario:</label>
+                      <input type="text" value={newAdminUser} onChange={e => setNewAdminUser(e.target.value)} className="w-full p-2 border rounded-xl bg-gray-50" required />
+                    </div>
+
+                    <div>
+                      <label className="block font-semibold text-gray-700 mb-1">Nueva Contraseña:</label>
+                      <input type="text" value={newAdminPass} onChange={e => setNewAdminPass(e.target.value)} className="w-full p-2 border rounded-xl bg-gray-50 font-mono" required />
+                    </div>
+                  </div>
+
+                  <div className="border-t pt-3 space-y-3">
+                    <p className="font-semibold text-gray-800">Canales para Recuperar Contraseña:</p>
+                    
+                    <div>
+                      <label className="block font-medium text-gray-700 mb-1">WhatsApp de Recuperación:</label>
+                      <input type="text" value={newAdminWsp} onChange={e => setNewAdminWsp(e.target.value)} className="w-full p-2 border rounded-xl bg-gray-50" placeholder="3512102238" required />
+                    </div>
+
+                    <div>
+                      <label className="block font-medium text-gray-700 mb-1">Email de Recuperación:</label>
+                      <input type="email" value={newAdminEmail} onChange={e => setNewAdminEmail(e.target.value)} className="w-full p-2 border rounded-xl bg-gray-50" placeholder="luisveron@ejemplo.com" required />
+                    </div>
+                  </div>
+
+                  <button type="submit" className="bg-[#768C77] text-white px-6 py-2.5 rounded-xl font-medium shadow">
+                    Guardar Cambios de Seguridad
+                  </button>
+                </form>
+              </div>
+            )}
+          </main>
+
+          {/* MODAL / COMPROBANTE DE COMPRA IMPRIMIBLE */}
+          {selectedReceipt && (
+            <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4 overflow-y-auto">
+              <div className="bg-white max-w-md w-full p-6 rounded-2xl shadow-2xl relative space-y-4" id="printable-receipt">
+                
+                <div className="text-center border-b pb-3">
+                  <h2 className="font-serif text-xl font-bold tracking-widest text-gray-800">L&V HOGAR</h2>
+                  <p className="text-[10px] text-gray-500 uppercase">Comprobante de Venta no Válido como Factura Fiscal</p>
+                  <p className="text-[11px] text-gray-600 mt-1">Malvinas Argentinas, Córdoba</p>
+                  <p className="text-[11px] text-gray-600">WhatsApp: 3512102238</p>
+                </div>
+
+                <div className="text-xs space-y-1 bg-gray-50 p-3 rounded-xl border">
+                  <div className="flex justify-between font-mono font-bold">
+                    <span>Comprobante N°:</span>
+                    <span>{selectedReceipt.id}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Fecha:</span>
+                    <span>{selectedReceipt.date}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Cliente:</span>
+                    <span>{selectedReceipt.clientName || 'Consumidor Final'}</span>
+                  </div>
+                  {selectedReceipt.clientAddress && (
+                    <div className="flex justify-between">
+                      <span>Dirección:</span>
+                      <span>{selectedReceipt.clientAddress}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between">
+                    <span>Forma de Pago:</span>
+                    <span>{selectedReceipt.paymentMethod || 'Efectivo'}</span>
+                  </div>
+                </div>
+
+                <div className="space-y-2 text-xs">
+                  <p className="font-bold border-b pb-1">Detalle del Pedido:</p>
+                  {selectedReceipt.items && selectedReceipt.items.map((it, idx) => (
+                    <div key={idx} className="flex justify-between items-center text-[11px] border-b pb-1">
+                      <div>
+                        <p className="font-semibold">{it.title}</p>
+                        {it.selectedOptions && <p className="text-[9px] text-gray-400">[{it.selectedOptions}]</p>}
+                      </div>
+                      <div className="text-right font-mono">
+                        <span>{it.qty} x ${Number(it.price).toLocaleString('es-AR')}</span>
+                        <p className="font-bold text-gray-800">${Number(it.price * it.qty).toLocaleString('es-AR')}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="border-t pt-2 space-y-1 text-xs">
+                  {selectedReceipt.deliveryCost > 0 && (
+                    <div className="flex justify-between text-gray-500">
+                      <span>Costo de Envío:</span>
+                      <span>${Number(selectedReceipt.deliveryCost).toLocaleString('es-AR')}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-sm font-bold text-[#768C77]">
+                    <span>Total Abonado:</span>
+                    <span>${Number(selectedReceipt.total).toLocaleString('es-AR')}</span>
+                  </div>
+                </div>
+
+                <div className="text-center pt-2 text-[10px] text-gray-400 border-t">
+                  <p>¡Muchas gracias por tu compra en L&V HOGAR!</p>
+                </div>
+
+                <div className="flex gap-2 pt-2 no-print">
+                  <button onClick={() => window.print()} className="w-1/2 bg-[#768C77] text-white py-2 rounded-xl text-xs font-medium">
+                    🖨️ Imprimir Ticket
+                  </button>
+                  <button onClick={() => setSelectedReceipt(null)} className="w-1/2 bg-gray-200 text-gray-700 py-2 rounded-xl text-xs font-medium">
+                    Cerrar
+                  </button>
+                </div>
+
+              </div>
+            </div>
+          )}
+
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(AdminApp));
+  </script>
+</body>
+</html>
