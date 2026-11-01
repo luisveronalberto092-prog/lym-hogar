@@ -11,7 +11,6 @@
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <!-- Fuentes modernas 2026 -->
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <style>
     body { font-family: 'Plus Jakarta Sans', sans-serif; }
@@ -154,6 +153,22 @@
         msg += `\n⏰ *Horario:* ${preferredTime}`;
         msg += `\n💳 *Pago:* ${paymentMethod}`;
         msg += `\n\n💰 *TOTAL FINAL:* $${getTotal().toLocaleString('es-AR')}\n\n¿Me confirman la disponibilidad?`;
+
+        window.open(`https://wa.me/5493512102238?text=${encodeURIComponent(msg)}`, '_blank');
+      };
+
+      // Función para consultar por WhatsApp sobre un producto específico
+      const handleProductWhatsAppInquiry = (p) => {
+        const variants = p.variants ? p.variants.split(',').map(v => v.trim()) : [];
+        const colors = p.colors ? p.colors.split(',').map(c => c.trim()) : [];
+        const selVar = variants.length > 0 ? (chosenVariant[p.id] || variants[0]) : '';
+        const selCol = colors.length > 0 ? (chosenColor[p.id] || colors[0]) : '';
+        const optText = [selVar, selCol].filter(Boolean).join(' / ');
+
+        let msg = `¡Hola L&V HOGAR! Tengo una consulta sobre este producto:\n\n📦 *${p.title}*`;
+        if (optText) msg += `\n⚙️ *Opción:* ${optText}`;
+        msg += `\n💰 *Precio:* $${Number(p.price).toLocaleString('es-AR')}`;
+        msg += `\n\n¿Me podrían dar más detalles o confirmar disponibilidad?`;
 
         window.open(`https://wa.me/5493512102238?text=${encodeURIComponent(msg)}`, '_blank');
       };
@@ -322,7 +337,7 @@
             )}
           </main>
 
-          {/* Modal Detalle Ampliado */}
+          {/* Modal Detalle Ampliado con Botón de Consulta por WhatsApp */}
           {selectedProduct && (() => {
             const productImages = getProductImages(selectedProduct);
             const currentImg = productImages[activeImageIndex] || selectedProduct.image;
@@ -397,9 +412,12 @@
                       )}
                     </div>
 
-                    <div className="mt-8 pt-4 border-t border-gray-100">
-                      <button onClick={() => { addToCart(selectedProduct); setSelectedProduct(null); }} style={{ backgroundColor: storeConfig.brandColor || '#768C77' }} className="w-full text-white py-3.5 rounded-2xl text-xs font-bold shadow-md hover:opacity-95 transition">
+                    <div className="mt-8 pt-4 border-t border-gray-100 space-y-2">
+                      <button onClick={() => { addToCart(selectedProduct); setSelectedProduct(null); }} style={{ backgroundColor: storeConfig.brandColor || '#768C77' }} className="w-full text-white py-3 rounded-xl text-xs font-bold shadow-md hover:opacity-95 transition">
                         Agregar al Carrito
+                      </button>
+                      <button onClick={() => handleProductWhatsAppInquiry(selectedProduct)} className="w-full bg-[#25D366] hover:bg-[#20ba5a] text-white py-2.5 rounded-xl text-xs font-semibold shadow-xs flex items-center justify-center gap-2 transition">
+                        <i className="fa-brands fa-whatsapp text-sm"></i> Consultar por este producto
                       </button>
                     </div>
                   </div>
@@ -416,8 +434,8 @@
             </div>
           )}
 
-          {/* Botón WhatsApp */}
-          <a href="https://wa.me/5493512102238?text=¡Hola%20L&V%20HOGAR!%20Tengo%20una%20consulta." target="_blank" rel="noopener noreferrer" className="fixed bottom-6 right-6 z-40 bg-[#25D366] text-white w-14 h-14 rounded-full flex items-center justify-center shadow-2xl hover:scale-110 transition">
+          {/* Botón flotante general de WhatsApp */}
+          <a href="https://wa.me/5493512102238?text=¡Hola%20L&V%20HOGAR!%20Tengo%20una%20consulta%20general." target="_blank" rel="noopener noreferrer" className="fixed bottom-6 right-6 z-40 bg-[#25D366] text-white w-14 h-14 rounded-full flex items-center justify-center shadow-2xl hover:scale-110 transition" title="¡Consultanos por WhatsApp!">
             <i className="fa-brands fa-whatsapp text-3xl"></i>
           </a>
 
