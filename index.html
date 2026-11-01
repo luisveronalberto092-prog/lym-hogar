@@ -39,7 +39,7 @@
       const [searchQuery, setSearchQuery] = useState('');
       
       const [selectedProduct, setSelectedProduct] = useState(null);
-      const [activeImageIndex, setActiveImageIndex] = useState(0); // Control por índice para galería
+      const [activeImageIndex, setActiveImageIndex] = useState(0);
       const [fullScreenImage, setFullScreenImage] = useState(null);
       
       const [quantities, setQuantities] = useState({});
@@ -123,7 +123,7 @@
         
         msg += `\n🛒 *PRODUCTOS:*\n`;
         cart.forEach(item => {
-          const vText = item.selectedVariant ? ` [${item.selectedVariant}]` : '';
+          const vText = item.selectedVariant ? ` [Opción/Talle: ${item.selectedVariant}]` : '';
           msg += `• ${item.title}${vText} x${item.qty} - $${(item.price * item.qty).toLocaleString('es-AR')}\n`;
         });
 
@@ -143,7 +143,6 @@
         window.open(`https://wa.me/5493512102238?text=${encodeURIComponent(msg)}`, '_blank');
       };
 
-      // Obtener todas las fotos de un producto (principal + galería)
       const getProductImages = (p) => {
         if (!p) return [];
         const main = p.image || 'https://images.unsplash.com/photo-1583847268964-b28dc8f51f92?auto=format&fit=crop&w=600&q=80';
@@ -208,7 +207,7 @@
               </div>
               <input 
                 type="text" 
-                placeholder="Buscar producto..." 
+                placeholder="Buscar producto, talle..." 
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
                 className="w-full md:w-64 p-2.5 bg-white/90 backdrop-blur-xs border rounded-full text-xs shadow-xs"
@@ -252,14 +251,18 @@
                           <button onClick={() => { setSelectedProduct(p); setActiveImageIndex(0); }} className="text-xs text-gray-500 underline">Ver detalle</button>
                         </div>
 
+                        {/* Selector Directo de Talle / Color / Variantes */}
                         {variants.length > 0 && (
-                          <select 
-                            value={activeVar} 
-                            onChange={e => setChosenVariant({...chosenVariant, [p.id]: e.target.value})}
-                            className="w-full p-1.5 bg-gray-50 border rounded-lg text-xs"
-                          >
-                            {variants.map((v, i) => <option key={i} value={v}>{v}</option>)}
-                          </select>
+                          <div>
+                            <label className="block text-[10px] font-bold text-gray-500 mb-1">Elegí Opción / Talle:</label>
+                            <select 
+                              value={activeVar} 
+                              onChange={e => setChosenVariant({...chosenVariant, [p.id]: e.target.value})}
+                              className="w-full p-1.5 bg-gray-50 border rounded-lg text-xs font-medium text-gray-700"
+                            >
+                              {variants.map((v, i) => <option key={i} value={v}>{v}</option>)}
+                            </select>
+                          </div>
                         )}
 
                         {isAvailable ? (
@@ -282,76 +285,39 @@
             )}
           </main>
 
-          {/* Modal Detalle + Galería con Flechas Anterior/Siguiente + Video */}
+          {/* Modal Detalle Ampliado + Ficha Técnica */}
           {selectedProduct && (() => {
             const productImages = getProductImages(selectedProduct);
             const currentImg = productImages[activeImageIndex] || selectedProduct.image;
-
-            const handlePrevImage = (e) => {
-              e.stopPropagation();
-              setActiveImageIndex(prev => (prev === 0 ? productImages.length - 1 : prev - 1));
-            };
-
-            const handleNextImage = (e) => {
-              e.stopPropagation();
-              setActiveImageIndex(prev => (prev === productImages.length - 1 ? 0 : prev + 1));
-            };
+            const variants = selectedProduct.variants ? selectedProduct.variants.split(',').map(v => v.trim()) : [];
+            const activeVar = chosenVariant[selectedProduct.id] || variants[0];
 
             return (
               <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 overflow-y-auto backdrop-blur-xs">
                 <div className="bg-white rounded-2xl max-w-2xl w-full overflow-hidden shadow-2xl my-auto flex flex-col md:flex-row">
                   
-                  {/* Visor con Flechas */}
                   <div className="w-full md:w-1/2 bg-black p-4 flex flex-col justify-center items-center relative">
                     <div className="h-64 sm:h-80 w-full flex items-center justify-center relative group">
                       <img 
                         src={currentImg} 
                         className="max-h-full max-w-full object-contain cursor-zoom-in" 
                         onClick={() => setFullScreenImage(currentImg)} 
-                        title="Toca para ver en pantalla completa"
                       />
                       
-                      {/* Flecha Izquierda */}
                       {productImages.length > 1 && (
-                        <button 
-                          onClick={handlePrevImage} 
-                          className="absolute left-2 bg-black/60 hover:bg-black text-white w-8 h-8 rounded-full flex items-center justify-center shadow transition"
-                        >
-                          <i className="fa-solid fa-chevron-left text-xs"></i>
-                        </button>
+                        <button onClick={(e) => { e.stopPropagation(); setActiveImageIndex(prev => (prev === 0 ? productImages.length - 1 : prev - 1)); }} className="absolute left-2 bg-black/60 text-white w-8 h-8 rounded-full flex items-center justify-center"><i className="fa-solid fa-chevron-left text-xs"></i></button>
                       )}
-
-                      {/* Flecha Derecha */}
                       {productImages.length > 1 && (
-                        <button 
-                          onClick={handleNextImage} 
-                          className="absolute right-2 bg-black/60 hover:bg-black text-white w-8 h-8 rounded-full flex items-center justify-center shadow transition"
-                        >
-                          <i className="fa-solid fa-chevron-right text-xs"></i>
-                        </button>
+                        <button onClick={(e) => { e.stopPropagation(); setActiveImageIndex(prev => (prev === productImages.length - 1 ? 0 : prev + 1)); }} className="absolute right-2 bg-black/60 text-white w-8 h-8 rounded-full flex items-center justify-center"><i className="fa-solid fa-chevron-right text-xs"></i></button>
                       )}
-
-                      <span className="absolute bottom-2 right-2 bg-black/70 text-white text-[10px] px-2 py-0.5 rounded">
-                        {activeImageIndex + 1} / {productImages.length}
-                      </span>
                     </div>
 
-                    {/* Miniaturas de Galería */}
                     {productImages.length > 1 && (
                       <div className="flex gap-2 mt-3 overflow-x-auto w-full pb-1">
                         {productImages.map((imgUrl, idx) => (
-                          <img 
-                            key={idx} 
-                            src={imgUrl} 
-                            onClick={() => setActiveImageIndex(idx)} 
-                            className={`w-12 h-12 object-cover rounded cursor-pointer border transition ${activeImageIndex === idx ? 'border-[#768C77] scale-105' : 'border-transparent opacity-60'}`} 
-                          />
+                          <img key={idx} src={imgUrl} onClick={() => setActiveImageIndex(idx)} className={`w-12 h-12 object-cover rounded cursor-pointer border ${activeImageIndex === idx ? 'border-[#768C77]' : 'border-transparent opacity-60'}`} />
                         ))}
                       </div>
-                    )}
-
-                    {selectedProduct.video && (
-                      <video src={selectedProduct.video} controls className="w-full h-24 object-cover rounded mt-3 bg-black"></video>
                     )}
                   </div>
 
@@ -365,6 +331,25 @@
                         <button onClick={() => setSelectedProduct(null)} className="text-gray-400 hover:text-black"><i className="fa-solid fa-xmark text-lg"></i></button>
                       </div>
                       <p style={{ color: storeConfig.brandColor || '#768C77' }} className="text-2xl font-serif font-bold mt-3">${Number(selectedProduct.price).toLocaleString('es-AR')}</p>
+
+                      {/* Selección de Variantes / Talles en el Modal */}
+                      {variants.length > 0 && (
+                        <div className="mt-4">
+                          <label className="block text-xs font-bold text-gray-700 mb-1.5">Seleccioná Talle / Color / Modelo:</label>
+                          <div className="flex flex-wrap gap-1.5">
+                            {variants.map((v, i) => (
+                              <button 
+                                key={i} 
+                                onClick={() => setChosenVariant({...chosenVariant, [selectedProduct.id]: v})}
+                                className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition ${activeVar === v ? 'bg-[#768C77] text-white border-[#768C77]' : 'bg-gray-50 text-gray-700 hover:bg-gray-100'}`}
+                              >
+                                {v}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
                       <p className="text-xs text-gray-600 mt-4 leading-relaxed">{selectedProduct.description}</p>
                     </div>
 
@@ -387,14 +372,8 @@
             </div>
           )}
 
-          {/* BOTÓN FLOTANTE DE WHATSAPP APARTE */}
-          <a 
-            href="https://wa.me/5493512102238?text=¡Hola%20L&V%20HOGAR!%20Tengo%20una%20consulta." 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="fixed bottom-6 right-6 z-40 bg-[#25D366] hover:bg-[#20ba5a] text-white w-14 h-14 rounded-full flex items-center justify-center shadow-2xl transition-transform hover:scale-110"
-            title="¡Consultanos por WhatsApp!"
-          >
+          {/* Botón Flotante de WhatsApp */}
+          <a href="https://wa.me/5493512102238?text=¡Hola%20L&V%20HOGAR!%20Tengo%20una%20consulta." target="_blank" rel="noopener noreferrer" className="fixed bottom-6 right-6 z-40 bg-[#25D366] text-white w-14 h-14 rounded-full flex items-center justify-center shadow-2xl hover:scale-110 transition">
             <i className="fa-brands fa-whatsapp text-3xl"></i>
           </a>
 
