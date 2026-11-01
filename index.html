@@ -12,7 +12,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
-<body class="bg-[#FAFAF7] text-gray-800 font-sans">
+<body class="bg-[#FAFAF7] text-gray-800 font-sans relative min-h-screen">
   <div id="root"></div>
 
   <script type="text/babel">
@@ -44,6 +44,18 @@
       
       const [quantities, setQuantities] = useState({});
       const [chosenVariant, setChosenVariant] = useState({});
+
+      // Configuración visual cargada desde localStorage
+      const [storeConfig] = useState(() => {
+        return JSON.parse(localStorage.getItem('lv_store_design')) || {
+          brandColor: '#768C77',
+          headerBg: '#1C1F1D',
+          bgLogoUrl: '',
+          bgOpacity: 0.1,
+          bgSize: 50,
+          bgRepeat: 'no-repeat'
+        };
+      });
 
       // Datos de checkout del cliente
       const [fulfillmentType, setFulfillmentType] = useState('delivery');
@@ -140,34 +152,49 @@
       });
 
       return (
-        <div className="min-h-screen flex flex-col">
-          <div className="bg-[#768C77] text-white text-[11px] py-1.5 px-4 text-center">
+        <div className="min-h-screen flex flex-col relative overflow-x-hidden">
+          {/* Fondo de Logo Calibrado */}
+          {storeConfig.bgLogoUrl && (
+            <div 
+              className="fixed inset-0 pointer-events-none z-0"
+              style={{
+                backgroundImage: `url(${storeConfig.bgLogoUrl})`,
+                backgroundPosition: 'center',
+                backgroundRepeat: storeConfig.bgRepeat || 'no-repeat',
+                backgroundSize: storeConfig.bgRepeat === 'repeat' ? '150px' : `${storeConfig.bgSize || 50}%`,
+                opacity: storeConfig.bgOpacity || 0.1
+              }}
+            />
+          )}
+
+          <div style={{ backgroundColor: storeConfig.brandColor || '#768C77' }} className="text-white text-[11px] py-1.5 px-4 text-center z-10">
             📍 Malvinas Argentinas y Córdoba Capital | ⏰ Lun a Sáb: 9 a 20hs
           </div>
 
-          <header className="bg-[#1C1F1D] text-white py-4 px-6 flex justify-between items-center shadow-md sticky top-0 z-40">
+          <header style={{ backgroundColor: storeConfig.headerBg || '#1C1F1D' }} className="text-white py-4 px-6 flex justify-between items-center shadow-md sticky top-0 z-40 border-b border-white/10">
             <div>
               <h1 className="text-lg font-serif tracking-widest text-white">L&V HOGAR</h1>
               <p className="text-[10px] text-[#C8B297] uppercase">Artículos para el hogar y cuidado personal</p>
             </div>
             <button 
               onClick={() => setIsCartOpen(true)}
-              className="bg-[#768C77] text-white px-4 py-2 rounded-full text-xs font-medium flex items-center gap-2 shadow"
+              style={{ backgroundColor: storeConfig.brandColor || '#768C77' }}
+              className="text-white px-4 py-2 rounded-full text-xs font-medium flex items-center gap-2 shadow"
             >
               <i className="fa-solid fa-bag-shopping"></i> Carrito ({cart.reduce((s, i) => s + i.qty, 0)})
             </button>
           </header>
 
-          <main className="max-w-7xl mx-auto px-4 py-8 flex-grow w-full">
-            {/* Categorías y Buscador */}
+          <main className="max-w-7xl mx-auto px-4 py-8 flex-grow w-full z-10 relative">
             <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-8">
               <div className="flex gap-2 overflow-x-auto w-full pb-2">
                 {categoriesList.map(cat => (
                   <button
                     key={cat}
                     onClick={() => setSelectedCategory(cat)}
+                    style={{ backgroundColor: selectedCategory === cat ? (storeConfig.brandColor || '#768C77') : '' }}
                     className={`px-4 py-2 rounded-2xl text-xs font-semibold whitespace-nowrap flex items-center gap-2 transition ${
-                      selectedCategory === cat ? 'bg-[#768C77] text-white shadow' : 'bg-white border text-gray-700 hover:bg-gray-50'
+                      selectedCategory === cat ? 'text-white shadow' : 'bg-white/90 backdrop-blur-xs border text-gray-700 hover:bg-gray-50'
                     }`}
                   >
                     <i className={`fa-solid ${cat === 'Todos' ? 'fa-border-all' : getCategoryIcon(cat)}`}></i> {cat}
@@ -179,7 +206,7 @@
                 placeholder="Buscar producto..." 
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
-                className="w-full md:w-64 p-2.5 bg-white border rounded-full text-xs shadow-xs"
+                className="w-full md:w-64 p-2.5 bg-white/90 backdrop-blur-xs border rounded-full text-xs shadow-xs"
               />
             </div>
 
@@ -196,7 +223,7 @@
                   const activeVar = chosenVariant[p.id] || variants[0];
 
                   return (
-                    <div key={p.id} className="bg-white rounded-2xl shadow-sm border overflow-hidden flex flex-col justify-between">
+                    <div key={p.id} className="bg-white/90 backdrop-blur-xs rounded-2xl shadow-sm border overflow-hidden flex flex-col justify-between">
                       <div>
                         <div 
                           className="h-52 bg-gray-100 relative cursor-pointer group"
@@ -208,7 +235,7 @@
                           </span>
                         </div>
                         <div className="p-5">
-                          <span className="text-[10px] font-semibold text-[#768C77] uppercase">{p.category}</span>
+                          <span style={{ color: storeConfig.brandColor || '#768C77' }} className="text-[10px] font-semibold uppercase">{p.category}</span>
                           <h3 className="font-serif text-base text-gray-800 mt-1 cursor-pointer hover:underline" onClick={() => { setSelectedProduct(p); setActiveModalImage(p.image); }}>{p.title}</h3>
                           <p className="text-gray-500 text-xs mt-2 line-clamp-2">{p.description}</p>
                         </div>
@@ -216,7 +243,7 @@
 
                       <div className="p-5 pt-0 space-y-3">
                         <div className="flex justify-between items-center">
-                          <span className="text-lg font-serif font-bold text-[#768C77]">${Number(p.price).toLocaleString('es-AR')}</span>
+                          <span style={{ color: storeConfig.brandColor || '#768C77' }} className="text-lg font-serif font-bold">${Number(p.price).toLocaleString('es-AR')}</span>
                           <button onClick={() => { setSelectedProduct(p); setActiveModalImage(p.image); }} className="text-xs text-gray-500 underline">Ver detalle</button>
                         </div>
 
@@ -237,7 +264,7 @@
                               <span className="text-xs font-bold w-4 text-center">{currentQty}</span>
                               <button onClick={() => handleQtyChange(p.id, 1)} className="w-6 h-6 bg-white rounded font-bold">+</button>
                             </div>
-                            <button onClick={() => addToCart(p)} className="bg-[#768C77] text-white px-3 py-1.5 rounded-lg text-xs font-medium shadow-xs">Agregar</button>
+                            <button onClick={() => addToCart(p)} style={{ backgroundColor: storeConfig.brandColor || '#768C77' }} className="text-white px-3 py-1.5 rounded-lg text-xs font-medium shadow-xs">Agregar</button>
                           </div>
                         ) : (
                           <button disabled className="w-full bg-gray-200 text-gray-400 py-2 rounded-xl text-xs cursor-not-allowed">Agotado</button>
@@ -250,7 +277,7 @@
             )}
           </main>
 
-          {/* Modal Detalle + Galería + Video + Pantalla Completa */}
+          {/* Modal Detalle + Galería + Video */}
           {selectedProduct && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 overflow-y-auto backdrop-blur-xs">
               <div className="bg-white rounded-2xl max-w-2xl w-full overflow-hidden shadow-2xl my-auto flex flex-col md:flex-row">
@@ -278,17 +305,17 @@
                   <div>
                     <div className="flex justify-between items-start">
                       <div>
-                        <span className="text-[10px] font-semibold text-[#768C77] uppercase">{selectedProduct.category}</span>
+                        <span style={{ color: storeConfig.brandColor || '#768C77' }} className="text-[10px] font-semibold uppercase">{selectedProduct.category}</span>
                         <h3 className="text-xl font-serif font-bold text-gray-800 mt-1">{selectedProduct.title}</h3>
                       </div>
                       <button onClick={() => setSelectedProduct(null)} className="text-gray-400 hover:text-black"><i className="fa-solid fa-xmark text-lg"></i></button>
                     </div>
-                    <p className="text-2xl font-serif font-bold text-[#768C77] mt-3">${Number(selectedProduct.price).toLocaleString('es-AR')}</p>
+                    <p style={{ color: storeConfig.brandColor || '#768C77' }} className="text-2xl font-serif font-bold mt-3">${Number(selectedProduct.price).toLocaleString('es-AR')}</p>
                     <p className="text-xs text-gray-600 mt-4 leading-relaxed">{selectedProduct.description}</p>
                   </div>
 
                   <div className="mt-6 pt-4 border-t">
-                    <button onClick={() => { addToCart(selectedProduct); setSelectedProduct(null); }} className="w-full bg-[#768C77] text-white py-3 rounded-xl text-xs font-medium shadow">
+                    <button onClick={() => { addToCart(selectedProduct); setSelectedProduct(null); }} style={{ backgroundColor: storeConfig.brandColor || '#768C77' }} className="w-full text-white py-3 rounded-xl text-xs font-medium shadow">
                       Agregar al Carrito
                     </button>
                   </div>
@@ -305,7 +332,7 @@
             </div>
           )}
 
-          {/* Carrito Lateral y Formulario Completo de Datos del Cliente */}
+          {/* Carrito Lateral con Formulario de Cliente */}
           {isCartOpen && (
             <div className="fixed inset-0 z-50 flex justify-end bg-black/40">
               <div className="bg-white w-full max-w-md h-full flex flex-col justify-between shadow-2xl p-6 overflow-y-auto">
@@ -395,7 +422,7 @@
                       <div className="flex justify-between font-bold border-t pt-1 text-[#768C77]"><span>Total:</span><span>${getTotal().toLocaleString('es-AR')}</span></div>
                     </div>
 
-                    <button onClick={handleCheckoutWhatsApp} className="w-full bg-[#768C77] text-white py-2.5 rounded-xl font-medium shadow flex items-center justify-center gap-2">
+                    <button onClick={handleCheckoutWhatsApp} style={{ backgroundColor: storeConfig.brandColor || '#768C77' }} className="w-full text-white py-2.5 rounded-xl font-medium shadow flex items-center justify-center gap-2">
                       <i className="fa-brands fa-whatsapp text-base"></i> Confirmar Pedido por WhatsApp
                     </button>
                   </div>
@@ -404,7 +431,7 @@
             </div>
           )}
 
-          <footer className="bg-[#1C1F1D] text-gray-400 py-6 text-center text-xs mt-auto">
+          <footer className="bg-[#1C1F1D] text-gray-400 py-6 text-center text-xs mt-auto z-10 relative">
             <p>© L&V HOGAR - Malvinas Argentinas y Córdoba Capital</p>
             <a href="admin.html" className="text-gray-500 hover:text-white text-[10px] block mt-2">Acceso Administrador</a>
           </footer>
