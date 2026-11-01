@@ -22,7 +22,11 @@
       "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNsZWR1YWFrbWViY25sZHFlYW9vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMyMjYxMzgsImV4cCI6MjEwODgwMjEzOH0.Wl1DsflvOJLNDCaCjdNyaGe91KpCH7zpqZGJVDOpH2s"
     );
 
-    const categoriesList = ["Todos", "Hogar", "Cuidado Personal", "Electrodomésticos", "Bazar y Cocina", "Aromas y Decoración", "Accesorios"];
+    // Lee las categorías guardadas desde el admin o usa por defecto
+    const categoriesList = ["Todos"].concat(
+      JSON.parse(localStorage.getItem('lv_store_categories')) || ["Hogar", "Cuidado Personal", "Electrodomésticos", "Bazar y Cocina", "Aromas y Decoración", "Accesorios"]
+    );
+
     const deliveryZones = [
       { name: "Malvinas Argentinas - 1ª Sección", price: 0 },
       { name: "Malvinas Argentinas - 2ª Sección", price: 500 },
@@ -44,6 +48,7 @@
       
       const [quantities, setQuantities] = useState({});
       const [chosenVariant, setChosenVariant] = useState({});
+      const [chosenColor, setChosenColor] = useState({});
 
       const [storeConfig] = useState(() => {
         return JSON.parse(localStorage.getItem('lv_store_design')) || {
@@ -91,20 +96,22 @@
 
       const addToCart = (product) => {
         const qtyToAdd = quantities[product.id] || 1;
-        let variantString = "";
-        if (product.variants && product.variants.trim()) {
-          const opts = product.variants.split(',').map(v => v.trim());
-          variantString = chosenVariant[product.id] || opts[0];
-        }
+        
+        const variants = product.variants ? product.variants.split(',').map(v => v.trim()) : [];
+        const colors = product.colors ? product.colors.split(',').map(c => c.trim()) : [];
 
-        const cartItemId = variantString ? `${product.id}-${variantString}` : product.id;
+        const selVar = variants.length > 0 ? (chosenVariant[product.id] || variants[0]) : '';
+        const selCol = colors.length > 0 ? (chosenColor[product.id] || colors[0]) : '';
+
+        const selectionText = [selVar, selCol].filter(Boolean).join(' / ');
+        const cartItemId = selectionText ? `${product.id}-${selectionText}` : product.id;
 
         setCart(prev => {
           const exists = prev.find(item => item.cartItemId === cartItemId);
           if (exists) {
             return prev.map(item => item.cartItemId === cartItemId ? { ...item, qty: item.qty + qtyToAdd } : item);
           }
-          return [...prev, { ...product, cartItemId, qty: qtyToAdd, selectedVariant: variantString }];
+          return [...prev, { ...product, cartItemId, qty: qtyToAdd, selectedOptions: selectionText }];
         });
         setIsCartOpen(true);
       };
@@ -123,8 +130,8 @@
         
         msg += `\n🛒 *PRODUCTOS:*\n`;
         cart.forEach(item => {
-          const vText = item.selectedVariant ? ` [Opción/Talle: ${item.selectedVariant}]` : '';
-          msg += `• ${item.title}${vText} x${item.qty} - $${(item.price * item.qty).toLocaleString('es-AR')}\n`;
+          const optText = item.selectedOptions ? ` [${item.selectedOptions}]` : '';
+          msg += `• ${item.title}${optText} x${item.qty} - $${(item.price * item.qty).toLocaleString('es-AR')}\n`;
         });
 
         msg += `\n💵 *Subtotal:* $${getSubtotal().toLocaleString('es-AR')}`;
@@ -207,7 +214,7 @@
               </div>
               <input 
                 type="text" 
-                placeholder="Buscar producto, talle..." 
+                placeholder="Buscar producto..." 
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
                 className="w-full md:w-64 p-2.5 bg-white/90 backdrop-blur-xs border rounded-full text-xs shadow-xs"
@@ -217,14 +224,18 @@
             {loading ? (
               <div className="text-center py-20 text-gray-400">Cargando catálogo...</div>
             ) : filtered.length === 0 ? (
-              <div className="text-center py-20 text-gray-400">No se encontraron productos.</div>
+              <div className="text-center py-20 text-gray-400">No se encontraron productos en esta categoría.</div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                 {filtered.map(p => {
                   const isAvailable = Number(p.stock) > 0;
                   const currentQty = quantities[p.id] || 1;
+                  
                   const variants = p.variants ? p.variants.split(',').map(v => v.trim()) : [];
+                  const colors = p.colors ? p.colors.split(',').map(c => c.trim()) : [];
+
                   const activeVar = chosenVariant[p.id] || variants[0];
+                  const activeCol = chosenColor[p.id] || colors[0];
 
                   return (
                     <div key={p.id} className="bg-white/90 backdrop-blur-xs rounded-2xl shadow-sm border overflow-hidden flex flex-col justify-between">
@@ -242,31 +253,38 @@
                           <span style={{ color: storeConfig.brandColor || '#768C77' }} className="text-[10px] font-semibold uppercase">{p.category}</span>
                           <h3 className="font-serif text-base text-gray-800 mt-1 cursor-pointer hover:underline" onClick={() => { setSelectedProduct(p); setActiveImageIndex(0); }}>{p.title}</h3>
                           <p className="text-gray-500 text-xs mt-2 line-clamp-2">{p.description}</p>
+                          {p.specifications && (
+                            <p className="text-[11px] text-gray-400 mt-1 font-mono">⚡ {p.specifications}</p>
+                          )}
                         </div>
                       </div>
 
-                      <div className="p-5 pt-0 space-y-3">
+                      <div className="p-5 pt-0 space-y-2.5">
                         <div className="flex justify-between items-center">
                           <span style={{ color: storeConfig.brandColor || '#768C77' }} className="text-lg font-serif font-bold">${Number(p.price).toLocaleString('es-AR')}</span>
                           <button onClick={() => { setSelectedProduct(p); setActiveImageIndex(0); }} className="text-xs text-gray-500 underline">Ver detalle</button>
                         </div>
 
-                        {/* Selector Directo de Talle / Color / Variantes */}
                         {variants.length > 0 && (
                           <div>
-                            <label className="block text-[10px] font-bold text-gray-500 mb-1">Elegí Opción / Talle:</label>
-                            <select 
-                              value={activeVar} 
-                              onChange={e => setChosenVariant({...chosenVariant, [p.id]: e.target.value})}
-                              className="w-full p-1.5 bg-gray-50 border rounded-lg text-xs font-medium text-gray-700"
-                            >
+                            <label className="block text-[10px] font-bold text-gray-500 mb-0.5">Talle / Medida:</label>
+                            <select value={activeVar} onChange={e => setChosenVariant({...chosenVariant, [p.id]: e.target.value})} className="w-full p-1.5 bg-gray-50 border rounded-lg text-xs font-medium text-gray-700">
                               {variants.map((v, i) => <option key={i} value={v}>{v}</option>)}
                             </select>
                           </div>
                         )}
 
+                        {colors.length > 0 && (
+                          <div>
+                            <label className="block text-[10px] font-bold text-gray-500 mb-0.5">Color / Modelo:</label>
+                            <select value={activeCol} onChange={e => setChosenColor({...chosenColor, [p.id]: e.target.value})} className="w-full p-1.5 bg-gray-50 border rounded-lg text-xs font-medium text-gray-700">
+                              {colors.map((c, i) => <option key={i} value={c}>{c}</option>)}
+                            </select>
+                          </div>
+                        )}
+
                         {isAvailable ? (
-                          <div className="flex items-center justify-between bg-gray-100 p-1 rounded-xl border">
+                          <div className="flex items-center justify-between bg-gray-100 p-1 rounded-xl border mt-2">
                             <div className="flex items-center gap-2 px-2">
                               <button onClick={() => handleQtyChange(p.id, -1)} className="w-6 h-6 bg-white rounded font-bold">-</button>
                               <span className="text-xs font-bold w-4 text-center">{currentQty}</span>
@@ -285,12 +303,16 @@
             )}
           </main>
 
-          {/* Modal Detalle Ampliado + Ficha Técnica */}
+          {/* Modal Detalle Ampliado */}
           {selectedProduct && (() => {
             const productImages = getProductImages(selectedProduct);
             const currentImg = productImages[activeImageIndex] || selectedProduct.image;
+            
             const variants = selectedProduct.variants ? selectedProduct.variants.split(',').map(v => v.trim()) : [];
+            const colors = selectedProduct.colors ? selectedProduct.colors.split(',').map(c => c.trim()) : [];
+
             const activeVar = chosenVariant[selectedProduct.id] || variants[0];
+            const activeCol = chosenColor[selectedProduct.id] || colors[0];
 
             return (
               <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 overflow-y-auto backdrop-blur-xs">
@@ -298,17 +320,13 @@
                   
                   <div className="w-full md:w-1/2 bg-black p-4 flex flex-col justify-center items-center relative">
                     <div className="h-64 sm:h-80 w-full flex items-center justify-center relative group">
-                      <img 
-                        src={currentImg} 
-                        className="max-h-full max-w-full object-contain cursor-zoom-in" 
-                        onClick={() => setFullScreenImage(currentImg)} 
-                      />
+                      <img src={currentImg} className="max-h-full max-w-full object-contain cursor-zoom-in" onClick={() => setFullScreenImage(currentImg)} />
                       
                       {productImages.length > 1 && (
-                        <button onClick={(e) => { e.stopPropagation(); setActiveImageIndex(prev => (prev === 0 ? productImages.length - 1 : prev - 1)); }} className="absolute left-2 bg-black/60 text-white w-8 h-8 rounded-full flex items-center justify-center"><i className="fa-solid fa-chevron-left text-xs"></i></button>
+                        <button onClick={(e) => { e.stopPropagation(); setActiveImageIndex(prev => (prev === 0 ? productImages.length - 1 : prev - 1)); }} className="absolute left-2 bg-black/65 text-white w-8 h-8 rounded-full flex items-center justify-center"><i className="fa-solid fa-chevron-left text-xs"></i></button>
                       )}
                       {productImages.length > 1 && (
-                        <button onClick={(e) => { e.stopPropagation(); setActiveImageIndex(prev => (prev === productImages.length - 1 ? 0 : prev + 1)); }} className="absolute right-2 bg-black/60 text-white w-8 h-8 rounded-full flex items-center justify-center"><i className="fa-solid fa-chevron-right text-xs"></i></button>
+                        <button onClick={(e) => { e.stopPropagation(); setActiveImageIndex(prev => (prev === productImages.length - 1 ? 0 : prev + 1)); }} className="absolute right-2 bg-black/65 text-white w-8 h-8 rounded-full flex items-center justify-center"><i className="fa-solid fa-chevron-right text-xs"></i></button>
                       )}
                     </div>
 
@@ -332,25 +350,32 @@
                       </div>
                       <p style={{ color: storeConfig.brandColor || '#768C77' }} className="text-2xl font-serif font-bold mt-3">${Number(selectedProduct.price).toLocaleString('es-AR')}</p>
 
-                      {/* Selección de Variantes / Talles en el Modal */}
                       {variants.length > 0 && (
-                        <div className="mt-4">
-                          <label className="block text-xs font-bold text-gray-700 mb-1.5">Seleccioná Talle / Color / Modelo:</label>
+                        <div className="mt-3">
+                          <label className="block text-xs font-bold text-gray-700 mb-1">Talle / Medida:</label>
                           <div className="flex flex-wrap gap-1.5">
                             {variants.map((v, i) => (
-                              <button 
-                                key={i} 
-                                onClick={() => setChosenVariant({...chosenVariant, [selectedProduct.id]: v})}
-                                className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition ${activeVar === v ? 'bg-[#768C77] text-white border-[#768C77]' : 'bg-gray-50 text-gray-700 hover:bg-gray-100'}`}
-                              >
-                                {v}
-                              </button>
+                              <button key={i} onClick={() => setChosenVariant({...chosenVariant, [selectedProduct.id]: v})} className={`px-3 py-1.5 rounded-lg text-xs font-medium border ${activeVar === v ? 'bg-[#768C77] text-white border-[#768C77]' : 'bg-gray-50 text-gray-700'}`}>{v}</button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {colors.length > 0 && (
+                        <div className="mt-3">
+                          <label className="block text-xs font-bold text-gray-700 mb-1">Color / Modelo:</label>
+                          <div className="flex flex-wrap gap-1.5">
+                            {colors.map((c, i) => (
+                              <button key={i} onClick={() => setChosenColor({...chosenColor, [selectedProduct.id]: c})} className={`px-3 py-1.5 rounded-lg text-xs font-medium border ${activeCol === c ? 'bg-[#768C77] text-white border-[#768C77]' : 'bg-gray-50 text-gray-700'}`}>{c}</button>
                             ))}
                           </div>
                         </div>
                       )}
 
                       <p className="text-xs text-gray-600 mt-4 leading-relaxed">{selectedProduct.description}</p>
+                      {selectedProduct.specifications && (
+                        <p className="text-xs text-gray-500 mt-2 bg-gray-50 p-2 rounded-lg border font-mono">⚡ <b>Especificaciones:</b> {selectedProduct.specifications}</p>
+                      )}
                     </div>
 
                     <div className="mt-6 pt-4 border-t">
@@ -372,7 +397,7 @@
             </div>
           )}
 
-          {/* Botón Flotante de WhatsApp */}
+          {/* Botón WhatsApp */}
           <a href="https://wa.me/5493512102238?text=¡Hola%20L&V%20HOGAR!%20Tengo%20una%20consulta." target="_blank" rel="noopener noreferrer" className="fixed bottom-6 right-6 z-40 bg-[#25D366] text-white w-14 h-14 rounded-full flex items-center justify-center shadow-2xl hover:scale-110 transition">
             <i className="fa-brands fa-whatsapp text-3xl"></i>
           </a>
@@ -396,7 +421,7 @@
                           <div className="flex items-center gap-3">
                             <img src={item.image} className="w-10 h-10 object-cover rounded border" />
                             <div>
-                              <p className="font-bold">{item.title} {item.selectedVariant ? `(${item.selectedVariant})` : ''}</p>
+                              <p className="font-bold">{item.title} {item.selectedOptions ? `(${item.selectedOptions})` : ''}</p>
                               <p className="text-gray-500">${Number(item.price).toLocaleString('es-AR')} x {item.qty}</p>
                             </div>
                           </div>
