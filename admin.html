@@ -38,7 +38,6 @@
       const [editingId, setEditingId] = useState(null);
       const [msg, setMsg] = useState('');
 
-      // Configuración extendida con Calibración de Fondo de Logo
       const [storeConfig, setStoreConfig] = useState(() => {
         return JSON.parse(localStorage.getItem('lv_store_design')) || {
           brandColor: '#768C77',
@@ -50,8 +49,18 @@
         };
       });
 
+      // Formulario con casilleros separados para múltiples opciones
       const [form, setForm] = useState({
-        title: '', price: '', stock: '10', category: 'Hogar', image: '', video: '', description: '', variants: ''
+        title: '', 
+        price: '', 
+        stock: '10', 
+        category: 'Hogar', 
+        image: '', 
+        video: '', 
+        description: '', 
+        variants: '',     // Talles / Opciones generales
+        colors: '',       // Casillero independiente para Colores
+        specifications: ''// Casillero independiente para Ficha técnica / Material
       });
       const [additionalImages, setAdditionalImages] = useState([]);
 
@@ -121,7 +130,9 @@
             video: form.video ? form.video.trim() : '',
             gallery: additionalImages,
             description: form.description ? form.description.trim() : '',
-            variants: form.variants ? form.variants.trim() : ''
+            variants: form.variants ? form.variants.trim() : '',
+            colors: form.colors ? form.colors.trim() : '',
+            specifications: form.specifications ? form.specifications.trim() : ''
           };
 
           if (editingId) {
@@ -152,7 +163,9 @@
           image: p.image || '',
           video: p.video || '',
           description: p.description || '',
-          variants: p.variants || ''
+          variants: p.variants || '',
+          colors: p.colors || '',
+          specifications: p.specifications || ''
         });
         setAdditionalImages(p.gallery || []);
         window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -171,7 +184,7 @@
 
       const resetForm = () => {
         setEditingId(null);
-        setForm({ title: '', price: '', stock: '10', category: 'Hogar', image: '', video: '', description: '', variants: '' });
+        setForm({ title: '', price: '', stock: '10', category: 'Hogar', image: '', video: '', description: '', variants: '', colors: '', specifications: '' });
         setAdditionalImages([]);
       };
 
@@ -221,7 +234,6 @@
           <main className="max-w-6xl mx-auto p-6 w-full flex-grow space-y-6">
             {msg && <div className="p-3 bg-emerald-50 text-emerald-800 text-xs rounded-xl font-medium">{msg}</div>}
 
-            {/* Panel de Métricas */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
               <div className="bg-white p-4 rounded-2xl border shadow-sm flex items-center justify-between">
                 <div>
@@ -248,7 +260,6 @@
               </div>
             </div>
 
-            {/* Pestañas de Navegación Admin */}
             <div className="flex gap-2 border-b pb-2 overflow-x-auto">
               <button onClick={() => setActiveTab('inventory')} className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap ${activeTab === 'inventory' ? 'bg-[#768C77] text-white' : 'bg-white border text-gray-700'}`}>📦 Inventario</button>
               <button onClick={() => setActiveTab('design')} className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap ${activeTab === 'design' ? 'bg-[#768C77] text-white' : 'bg-white border text-gray-700'}`}>🎨 Diseño & Calibrador de Fondo</button>
@@ -258,7 +269,7 @@
             {activeTab === 'inventory' ? (
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 
-                {/* Formulario */}
+                {/* Formulario con Casilleros Adicionales */}
                 <div className="bg-white p-5 rounded-2xl border space-y-3 text-xs">
                   <div className="flex justify-between items-center">
                     <h3 className="font-serif font-bold text-sm">{editingId ? '✏️ Editar Producto' : '📦 Cargar Producto'}</h3>
@@ -290,8 +301,19 @@
                         <input type="number" value={form.stock} onChange={e => setForm({...form, stock: e.target.value})} className="w-full p-2 border rounded-xl bg-gray-50" required />
                       </div>
                       <div>
-                        <label className="block font-medium mb-1">Variantes</label>
-                        <input type="text" placeholder="Ej: Rojo, Azul" value={form.variants} onChange={e => setForm({...form, variants: e.target.value})} className="w-full p-2 border rounded-xl bg-gray-50" />
+                        <label className="block font-medium mb-1">Talles / Medidas</label>
+                        <input type="text" placeholder="Ej: S, M, L o 30x40" value={form.variants} onChange={e => setForm({...form, variants: e.target.value})} className="w-full p-2 border rounded-xl bg-gray-50" />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block font-medium mb-1">Colores / Modelos</label>
+                        <input type="text" placeholder="Ej: Rojo, Negro, Blanco" value={form.colors} onChange={e => setForm({...form, colors: e.target.value})} className="w-full p-2 border rounded-xl bg-gray-50" />
+                      </div>
+                      <div>
+                        <label className="block font-medium mb-1">Especificaciones / Material</label>
+                        <input type="text" placeholder="Ej: Acero, 220V, BPA Free" value={form.specifications} onChange={e => setForm({...form, specifications: e.target.value})} className="w-full p-2 border rounded-xl bg-gray-50" />
                       </div>
                     </div>
 
@@ -374,7 +396,6 @@
 
               </div>
             ) : activeTab === 'design' ? (
-              /* CALIBRADOR DE FONDO DE LOGO Y DISEÑO */
               <div className="bg-white p-6 rounded-2xl border space-y-6 text-xs">
                 <div>
                   <h3 className="font-serif font-bold text-sm text-gray-800 flex items-center gap-2">
@@ -384,7 +405,6 @@
                 </div>
 
                 <form onSubmit={handleSaveDesign} className="space-y-4 max-w-xl">
-                  {/* Carga del Logo de Fondo */}
                   <div className="bg-gray-50 p-4 rounded-2xl border space-y-2">
                     <label className="block font-semibold text-gray-700">🖼️ Logo para Fondo de Pantalla:</label>
                     <input type="file" accept="image/*" onChange={e => handleFileSelection(e, 'bgLogo')} className="w-full text-xs" />
@@ -397,34 +417,15 @@
                     )}
                   </div>
 
-                  {/* Controles de Calibración */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-gray-50 p-4 rounded-2xl border">
                     <div>
-                      <label className="block font-semibold text-gray-700 mb-1">Transparencia / Opacidad: ({Math.round(storeConfig.bgOpacity * 100)}%)</label>
-                      <input 
-                        type="range" 
-                        min="0.02" 
-                        max="0.5" 
-                        step="0.01" 
-                        value={storeConfig.bgOpacity} 
-                        onChange={e => setStoreConfig({...storeConfig, bgOpacity: parseFloat(e.target.value)})}
-                        className="w-full accent-[#768C77]"
-                      />
+                      <label className="block font-semibold text-gray-700 mb-1">Transparencia: ({Math.round(storeConfig.bgOpacity * 100)}%)</label>
+                      <input type="range" min="0.02" max="0.5" step="0.01" value={storeConfig.bgOpacity} onChange={e => setStoreConfig({...storeConfig, bgOpacity: parseFloat(e.target.value)})} className="w-full accent-[#768C77]" />
                     </div>
-
                     <div>
                       <label className="block font-semibold text-gray-700 mb-1">Tamaño del Logo: ({storeConfig.bgSize}%)</label>
-                      <input 
-                        type="range" 
-                        min="10" 
-                        max="100" 
-                        step="5" 
-                        value={storeConfig.bgSize} 
-                        onChange={e => setStoreConfig({...storeConfig, bgSize: parseInt(e.target.value)})}
-                        className="w-full accent-[#768C77]"
-                      />
+                      <input type="range" min="10" max="100" step="5" value={storeConfig.bgSize} onChange={e => setStoreConfig({...storeConfig, bgSize: parseInt(e.target.value)})} className="w-full accent-[#768C77]" />
                     </div>
-
                     <div>
                       <label className="block font-semibold text-gray-700 mb-1">Modo de Fondo:</label>
                       <select value={storeConfig.bgRepeat} onChange={e => setStoreConfig({...storeConfig, bgRepeat: e.target.value})} className="w-full p-2 border rounded-xl bg-white text-xs">
@@ -432,9 +433,8 @@
                         <option value="repeat">Mosaico (Patrón Repetido)</option>
                       </select>
                     </div>
-
                     <div>
-                      <label className="block font-semibold text-gray-700 mb-1">Color de Marca Institucional:</label>
+                      <label className="block font-semibold text-gray-700 mb-1">Color de Marca:</label>
                       <div className="flex items-center gap-2">
                         <input type="color" value={storeConfig.brandColor} onChange={e => setStoreConfig({...storeConfig, brandColor: e.target.value})} className="w-10 h-10 rounded cursor-pointer border" />
                         <span className="font-mono text-gray-600">{storeConfig.brandColor}</span>
@@ -442,13 +442,10 @@
                     </div>
                   </div>
 
-                  <button type="submit" className="bg-[#768C77] text-white px-6 py-2.5 rounded-xl font-medium shadow">
-                    Guardar Configuración Visual
-                  </button>
+                  <button type="submit" className="bg-[#768C77] text-white px-6 py-2.5 rounded-xl font-medium shadow">Guardar Configuración Visual</button>
                 </form>
               </div>
             ) : (
-              /* Historial de Pedidos */
               <div className="bg-white p-5 rounded-2xl border space-y-4 text-xs">
                 <h3 className="font-serif font-bold text-sm">Historial de Pedidos Generados</h3>
                 {orderHistory.length === 0 ? (
