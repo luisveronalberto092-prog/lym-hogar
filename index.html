@@ -39,13 +39,12 @@
       const [searchQuery, setSearchQuery] = useState('');
       
       const [selectedProduct, setSelectedProduct] = useState(null);
-      const [activeModalImage, setActiveModalImage] = useState('');
+      const [activeImageIndex, setActiveImageIndex] = useState(0); // Control por índice para galería
       const [fullScreenImage, setFullScreenImage] = useState(null);
       
       const [quantities, setQuantities] = useState({});
       const [chosenVariant, setChosenVariant] = useState({});
 
-      // Configuración visual cargada desde localStorage
       const [storeConfig] = useState(() => {
         return JSON.parse(localStorage.getItem('lv_store_design')) || {
           brandColor: '#768C77',
@@ -57,7 +56,6 @@
         };
       });
 
-      // Datos de checkout del cliente
       const [fulfillmentType, setFulfillmentType] = useState('delivery');
       const [selectedDeliveryZone, setSelectedDeliveryZone] = useState(0);
       const [clientName, setClientName] = useState('');
@@ -145,6 +143,14 @@
         window.open(`https://wa.me/5493512102238?text=${encodeURIComponent(msg)}`, '_blank');
       };
 
+      // Obtener todas las fotos de un producto (principal + galería)
+      const getProductImages = (p) => {
+        if (!p) return [];
+        const main = p.image || 'https://images.unsplash.com/photo-1583847268964-b28dc8f51f92?auto=format&fit=crop&w=600&q=80';
+        const gal = (p.gallery && Array.isArray(p.gallery)) ? p.gallery : [];
+        return [main, ...gal];
+      };
+
       const filtered = products.filter(p => {
         const matchesCat = selectedCategory === 'Todos' || p.category === selectedCategory;
         const matchesSearch = p.title?.toLowerCase().includes(searchQuery.toLowerCase()) || p.description?.toLowerCase().includes(searchQuery.toLowerCase());
@@ -153,7 +159,6 @@
 
       return (
         <div className="min-h-screen flex flex-col relative overflow-x-hidden">
-          {/* Fondo de Logo Calibrado */}
           {storeConfig.bgLogoUrl && (
             <div 
               className="fixed inset-0 pointer-events-none z-0"
@@ -227,7 +232,7 @@
                       <div>
                         <div 
                           className="h-52 bg-gray-100 relative cursor-pointer group"
-                          onClick={() => { setSelectedProduct(p); setActiveModalImage(p.image); }}
+                          onClick={() => { setSelectedProduct(p); setActiveImageIndex(0); }}
                         >
                           <img src={p.image || 'https://images.unsplash.com/photo-1583847268964-b28dc8f51f92?auto=format&fit=crop&w=600&q=80'} className="w-full h-full object-cover group-hover:scale-105 transition" />
                           <span className={`absolute top-3 right-3 text-[10px] font-bold px-2.5 py-1 rounded-full shadow ${isAvailable ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}`}>
@@ -236,7 +241,7 @@
                         </div>
                         <div className="p-5">
                           <span style={{ color: storeConfig.brandColor || '#768C77' }} className="text-[10px] font-semibold uppercase">{p.category}</span>
-                          <h3 className="font-serif text-base text-gray-800 mt-1 cursor-pointer hover:underline" onClick={() => { setSelectedProduct(p); setActiveModalImage(p.image); }}>{p.title}</h3>
+                          <h3 className="font-serif text-base text-gray-800 mt-1 cursor-pointer hover:underline" onClick={() => { setSelectedProduct(p); setActiveImageIndex(0); }}>{p.title}</h3>
                           <p className="text-gray-500 text-xs mt-2 line-clamp-2">{p.description}</p>
                         </div>
                       </div>
@@ -244,7 +249,7 @@
                       <div className="p-5 pt-0 space-y-3">
                         <div className="flex justify-between items-center">
                           <span style={{ color: storeConfig.brandColor || '#768C77' }} className="text-lg font-serif font-bold">${Number(p.price).toLocaleString('es-AR')}</span>
-                          <button onClick={() => { setSelectedProduct(p); setActiveModalImage(p.image); }} className="text-xs text-gray-500 underline">Ver detalle</button>
+                          <button onClick={() => { setSelectedProduct(p); setActiveImageIndex(0); }} className="text-xs text-gray-500 underline">Ver detalle</button>
                         </div>
 
                         {variants.length > 0 && (
@@ -277,52 +282,102 @@
             )}
           </main>
 
-          {/* Modal Detalle + Galería + Video */}
-          {selectedProduct && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 overflow-y-auto backdrop-blur-xs">
-              <div className="bg-white rounded-2xl max-w-2xl w-full overflow-hidden shadow-2xl my-auto flex flex-col md:flex-row">
-                <div className="w-full md:w-1/2 bg-black p-4 flex flex-col justify-center items-center relative">
-                  <div className="h-64 sm:h-80 w-full flex items-center justify-center cursor-zoom-in" onClick={() => setFullScreenImage(activeModalImage || selectedProduct.image)}>
-                    <img src={activeModalImage || selectedProduct.image} className="max-h-full max-w-full object-contain" />
-                    <span className="absolute bottom-2 right-2 bg-black/70 text-white text-[10px] px-2 py-1 rounded">Ver gigante</span>
-                  </div>
+          {/* Modal Detalle + Galería con Flechas Anterior/Siguiente + Video */}
+          {selectedProduct && (() => {
+            const productImages = getProductImages(selectedProduct);
+            const currentImg = productImages[activeImageIndex] || selectedProduct.image;
 
-                  {selectedProduct.gallery && selectedProduct.gallery.length > 0 && (
-                    <div className="flex gap-2 mt-3 overflow-x-auto w-full pb-1">
-                      <img src={selectedProduct.image} onClick={() => setActiveModalImage(selectedProduct.image)} className={`w-12 h-12 object-cover rounded cursor-pointer border ${activeModalImage === selectedProduct.image ? 'border-[#768C77]' : 'border-transparent'}`} />
-                      {selectedProduct.gallery.map((img, idx) => (
-                        <img key={idx} src={img} onClick={() => setActiveModalImage(img)} className={`w-12 h-12 object-cover rounded cursor-pointer border ${activeModalImage === img ? 'border-[#768C77]' : 'border-transparent'}`} />
-                      ))}
+            const handlePrevImage = (e) => {
+              e.stopPropagation();
+              setActiveImageIndex(prev => (prev === 0 ? productImages.length - 1 : prev - 1));
+            };
+
+            const handleNextImage = (e) => {
+              e.stopPropagation();
+              setActiveImageIndex(prev => (prev === productImages.length - 1 ? 0 : prev + 1));
+            };
+
+            return (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 overflow-y-auto backdrop-blur-xs">
+                <div className="bg-white rounded-2xl max-w-2xl w-full overflow-hidden shadow-2xl my-auto flex flex-col md:flex-row">
+                  
+                  {/* Visor con Flechas */}
+                  <div className="w-full md:w-1/2 bg-black p-4 flex flex-col justify-center items-center relative">
+                    <div className="h-64 sm:h-80 w-full flex items-center justify-center relative group">
+                      <img 
+                        src={currentImg} 
+                        className="max-h-full max-w-full object-contain cursor-zoom-in" 
+                        onClick={() => setFullScreenImage(currentImg)} 
+                        title="Toca para ver en pantalla completa"
+                      />
+                      
+                      {/* Flecha Izquierda */}
+                      {productImages.length > 1 && (
+                        <button 
+                          onClick={handlePrevImage} 
+                          className="absolute left-2 bg-black/60 hover:bg-black text-white w-8 h-8 rounded-full flex items-center justify-center shadow transition"
+                        >
+                          <i className="fa-solid fa-chevron-left text-xs"></i>
+                        </button>
+                      )}
+
+                      {/* Flecha Derecha */}
+                      {productImages.length > 1 && (
+                        <button 
+                          onClick={handleNextImage} 
+                          className="absolute right-2 bg-black/60 hover:bg-black text-white w-8 h-8 rounded-full flex items-center justify-center shadow transition"
+                        >
+                          <i className="fa-solid fa-chevron-right text-xs"></i>
+                        </button>
+                      )}
+
+                      <span className="absolute bottom-2 right-2 bg-black/70 text-white text-[10px] px-2 py-0.5 rounded">
+                        {activeImageIndex + 1} / {productImages.length}
+                      </span>
                     </div>
-                  )}
 
-                  {selectedProduct.video && (
-                    <video src={selectedProduct.video} controls className="w-full h-28 object-cover rounded mt-3 bg-black"></video>
-                  )}
-                </div>
-
-                <div className="w-full md:w-1/2 p-6 flex flex-col justify-between bg-white">
-                  <div>
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <span style={{ color: storeConfig.brandColor || '#768C77' }} className="text-[10px] font-semibold uppercase">{selectedProduct.category}</span>
-                        <h3 className="text-xl font-serif font-bold text-gray-800 mt-1">{selectedProduct.title}</h3>
+                    {/* Miniaturas de Galería */}
+                    {productImages.length > 1 && (
+                      <div className="flex gap-2 mt-3 overflow-x-auto w-full pb-1">
+                        {productImages.map((imgUrl, idx) => (
+                          <img 
+                            key={idx} 
+                            src={imgUrl} 
+                            onClick={() => setActiveImageIndex(idx)} 
+                            className={`w-12 h-12 object-cover rounded cursor-pointer border transition ${activeImageIndex === idx ? 'border-[#768C77] scale-105' : 'border-transparent opacity-60'}`} 
+                          />
+                        ))}
                       </div>
-                      <button onClick={() => setSelectedProduct(null)} className="text-gray-400 hover:text-black"><i className="fa-solid fa-xmark text-lg"></i></button>
-                    </div>
-                    <p style={{ color: storeConfig.brandColor || '#768C77' }} className="text-2xl font-serif font-bold mt-3">${Number(selectedProduct.price).toLocaleString('es-AR')}</p>
-                    <p className="text-xs text-gray-600 mt-4 leading-relaxed">{selectedProduct.description}</p>
+                    )}
+
+                    {selectedProduct.video && (
+                      <video src={selectedProduct.video} controls className="w-full h-24 object-cover rounded mt-3 bg-black"></video>
+                    )}
                   </div>
 
-                  <div className="mt-6 pt-4 border-t">
-                    <button onClick={() => { addToCart(selectedProduct); setSelectedProduct(null); }} style={{ backgroundColor: storeConfig.brandColor || '#768C77' }} className="w-full text-white py-3 rounded-xl text-xs font-medium shadow">
-                      Agregar al Carrito
-                    </button>
+                  <div className="w-full md:w-1/2 p-6 flex flex-col justify-between bg-white">
+                    <div>
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <span style={{ color: storeConfig.brandColor || '#768C77' }} className="text-[10px] font-semibold uppercase">{selectedProduct.category}</span>
+                          <h3 className="text-xl font-serif font-bold text-gray-800 mt-1">{selectedProduct.title}</h3>
+                        </div>
+                        <button onClick={() => setSelectedProduct(null)} className="text-gray-400 hover:text-black"><i className="fa-solid fa-xmark text-lg"></i></button>
+                      </div>
+                      <p style={{ color: storeConfig.brandColor || '#768C77' }} className="text-2xl font-serif font-bold mt-3">${Number(selectedProduct.price).toLocaleString('es-AR')}</p>
+                      <p className="text-xs text-gray-600 mt-4 leading-relaxed">{selectedProduct.description}</p>
+                    </div>
+
+                    <div className="mt-6 pt-4 border-t">
+                      <button onClick={() => { addToCart(selectedProduct); setSelectedProduct(null); }} style={{ backgroundColor: storeConfig.brandColor || '#768C77' }} className="w-full text-white py-3 rounded-xl text-xs font-medium shadow">
+                        Agregar al Carrito
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {/* Visor Pantalla Completa */}
           {fullScreenImage && (
@@ -332,7 +387,18 @@
             </div>
           )}
 
-          {/* Carrito Lateral con Formulario de Cliente */}
+          {/* BOTÓN FLOTANTE DE WHATSAPP APARTE */}
+          <a 
+            href="https://wa.me/5493512102238?text=¡Hola%20L&V%20HOGAR!%20Tengo%20una%20consulta." 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="fixed bottom-6 right-6 z-40 bg-[#25D366] hover:bg-[#20ba5a] text-white w-14 h-14 rounded-full flex items-center justify-center shadow-2xl transition-transform hover:scale-110"
+            title="¡Consultanos por WhatsApp!"
+          >
+            <i className="fa-brands fa-whatsapp text-3xl"></i>
+          </a>
+
+          {/* Carrito Lateral */}
           {isCartOpen && (
             <div className="fixed inset-0 z-50 flex justify-end bg-black/40">
               <div className="bg-white w-full max-w-md h-full flex flex-col justify-between shadow-2xl p-6 overflow-y-auto">
