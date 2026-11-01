@@ -25,6 +25,16 @@
     const categoriesList = ["Hogar", "Cuidado Personal", "Electrodomésticos", "Bazar y Cocina", "Aromas y Decoración", "Accesorios"];
 
     function AdminApp() {
+      // Credenciales guardadas dinámicamente en localStorage (Valores iniciales: admin / admin123)
+      const [authConfig, setAuthConfig] = useState(() => {
+        return JSON.parse(localStorage.getItem('lv_admin_credentials')) || {
+          user: 'admin',
+          pass: 'admin123',
+          email: 'luisveron@ejemplo.com',
+          wsp: '3512102238'
+        };
+      });
+
       const [isAuth, setIsAuth] = useState(false);
       const [user, setUser] = useState('');
       const [pass, setPass] = useState('');
@@ -32,11 +42,17 @@
       
       // Estado para la recuperación de contraseña
       const [isRecovering, setIsRecovering] = useState(false);
-      const [recoveryWord, setRecoveryWord] = useState('');
+      const [recoveryMethod, setRecoveryMethod] = useState('wsp'); // 'wsp' o 'email'
+      const [recoveryInput, setRecoveryInput] = useState('');
       const [recoveryMsg, setRecoveryMsg] = useState('');
 
-      const [activeTab, setActiveTab] = useState('inventory');
+      // Formulario de cambio de credenciales dentro del panel
+      const [newAdminUser, setNewAdminUser] = useState(authConfig.user);
+      const [newAdminPass, setNewAdminPass] = useState(authConfig.pass);
+      const [newAdminEmail, setNewAdminEmail] = useState(authConfig.email);
+      const [newAdminWsp, setNewAdminWsp] = useState(authConfig.wsp);
 
+      const [activeTab, setActiveTab] = useState('inventory');
       const [products, setProducts] = useState([]);
       const [orderHistory, setOrderHistory] = useState([]);
       const [loading, setLoading] = useState(true);
@@ -55,16 +71,7 @@
       });
 
       const [form, setForm] = useState({
-        title: '', 
-        price: '', 
-        stock: '10', 
-        category: 'Hogar', 
-        image: '', 
-        video: '', 
-        description: '', 
-        variants: '',     
-        colors: '',       
-        specifications: ''
+        title: '', price: '', stock: '10', category: 'Hogar', image: '', video: '', description: '', variants: '', colors: '', specifications: ''
       });
       const [additionalImages, setAdditionalImages] = useState([]);
 
@@ -115,22 +122,49 @@
 
       const handleLogin = e => {
         e.preventDefault();
-        if (user === 'admin' && pass === 'admin123') {
+        if (user.trim() === authConfig.user && pass.trim() === authConfig.pass) {
           setIsAuth(true);
+          setError('');
         } else {
-          setError('Usuario o contraseña incorrectos (admin / admin123)');
+          setError('Usuario o contraseña incorrectos.');
         }
       };
 
+      // Proceso de recuperación vía WhatsApp o Email
       const handleRecovery = e => {
         e.preventDefault();
-        // Palabra clave secreta de recuperación para Luis
-        if (recoveryWord.trim().toLowerCase() === 'malvinas') {
-          setRecoveryMsg('✅ Contraseña restablecida con éxito. Tus datos de acceso son:\nUsuario: admin\nContraseña: admin123');
-          setRecoveryWord('');
+        const inputClean = recoveryInput.trim().toLowerCase();
+
+        if (recoveryMethod === 'wsp') {
+          if (inputClean.includes(authConfig.wsp) || authConfig.wsp.includes(inputClean)) {
+            const wspMessage = `¡Hola Luis! Solicitaste la recuperación de acceso a L&V HOGAR.\n\n👤 *Usuario:* ${authConfig.user}\n🔑 *Contraseña:* ${authConfig.pass}`;
+            window.open(`https://wa.me/549${authConfig.wsp}?text=${encodeURIComponent(wspMessage)}`, '_blank');
+            setRecoveryMsg('✅ Te abrimos WhatsApp con tus datos de acceso.');
+          } else {
+            setRecoveryMsg('❌ El número ingresado no coincide con el registrado.');
+          }
         } else {
-          setRecoveryMsg('❌ Palabra secreta incorrecta. Probá con "malvinas".');
+          if (inputClean === authConfig.email.toLowerCase()) {
+            setRecoveryMsg(`✅ Se ha generado la clave de acceso para tu mail: ${authConfig.email}.\nUsuario: ${authConfig.user}\nContraseña: ${authConfig.pass}`);
+          } else {
+            setRecoveryMsg('❌ El correo ingresado no coincide con el registrado.');
+          }
         }
+      };
+
+      // Guardar nuevo Usuario y Contraseña
+      const handleUpdateCredentials = e => {
+        e.preventDefault();
+        const updated = {
+          user: newAdminUser.trim(),
+          pass: newAdminPass.trim(),
+          email: newAdminEmail.trim(),
+          wsp: newAdminWsp.trim()
+        };
+        setAuthConfig(updated);
+        localStorage.setItem('lv_admin_credentials', JSON.stringify(updated));
+        setMsg('¡Credenciales de acceso actualizadas con éxito!');
+        setTimeout(() => setMsg(''), 3000);
       };
 
       const handleSave = async e => {
@@ -244,15 +278,34 @@
               ) : (
                 <>
                   <div className="text-center text-xs text-gray-600">
-                    <p>Ingresá la palabra clave secreta de seguridad para recordar tus datos de acceso.</p>
+                    <p className="font-semibold mb-1">Recuperar Acceso</p>
+                    <p>Elegí dónde querés recibir tus datos de ingreso:</p>
                   </div>
+
+                  <div className="flex gap-2 text-xs">
+                    <button type="button" onClick={() => setRecoveryMethod('wsp')} className={`w-1/2 p-2 rounded-xl border font-medium ${recoveryMethod === 'wsp' ? 'bg-[#25D366] text-white border-[#25D366]' : 'bg-gray-50'}`}>💬 WhatsApp</button>
+                    <button type="button" onClick={() => setRecoveryMethod('email')} className={`w-1/2 p-2 rounded-xl border font-medium ${recoveryMethod === 'email' ? 'bg-[#768C77] text-white border-[#768C77]' : 'bg-gray-50'}`}>✉️ Email</button>
+                  </div>
+
                   {recoveryMsg && <div className="text-xs p-2.5 rounded bg-gray-50 border text-center font-medium whitespace-pre-line">{recoveryMsg}</div>}
+                  
                   <form onSubmit={handleRecovery} className="space-y-3">
                     <div>
-                      <label className="block text-xs font-semibold mb-1">Palabra Secreta:</label>
-                      <input type="text" placeholder="Ej: malvinas" value={recoveryWord} onChange={e => setRecoveryWord(e.target.value)} className="w-full p-2.5 border rounded-xl text-xs bg-gray-50" required />
+                      <label className="block text-xs font-semibold mb-1">
+                        {recoveryMethod === 'wsp' ? 'Tu WhatsApp (ej: 3512102238):' : 'Tu Correo Electrónico:'}
+                      </label>
+                      <input 
+                        type={recoveryMethod === 'wsp' ? 'text' : 'email'} 
+                        placeholder={recoveryMethod === 'wsp' ? '3512102238' : 'tu-email@gmail.com'} 
+                        value={recoveryInput} 
+                        onChange={e => setRecoveryInput(e.target.value)} 
+                        className="w-full p-2.5 border rounded-xl text-xs bg-gray-50" 
+                        required 
+                      />
                     </div>
-                    <button type="submit" className="w-full bg-[#768C77] text-white py-2.5 rounded-xl text-xs font-medium shadow">Verificar Palabra</button>
+                    <button type="submit" className="w-full bg-[#768C77] text-white py-2.5 rounded-xl text-xs font-medium shadow">
+                      Enviar Datos de Ingreso
+                    </button>
                   </form>
                   <button onClick={() => { setIsRecovering(false); setRecoveryMsg(''); }} className="w-full text-xs text-gray-500 underline text-center pt-2">Volver al Login</button>
                 </>
@@ -303,7 +356,8 @@
 
             <div className="flex gap-2 border-b pb-2 overflow-x-auto">
               <button onClick={() => setActiveTab('inventory')} className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap ${activeTab === 'inventory' ? 'bg-[#768C77] text-white' : 'bg-white border text-gray-700'}`}>📦 Inventario</button>
-              <button onClick={() => setActiveTab('design')} className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap ${activeTab === 'design' ? 'bg-[#768C77] text-white' : 'bg-white border text-gray-700'}`}>🎨 Diseño & Calibrador de Fondo</button>
+              <button onClick={() => setActiveTab('design')} className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap ${activeTab === 'design' ? 'bg-[#768C77] text-white' : 'bg-white border text-gray-700'}`}>🎨 Diseño & Fondo</button>
+              <button onClick={() => setActiveTab('security')} className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap ${activeTab === 'security' ? 'bg-[#768C77] text-white' : 'bg-white border text-gray-700'}`}>🔐 Seguridad & Claves</button>
               <button onClick={() => setActiveTab('history')} className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap ${activeTab === 'history' ? 'bg-[#768C77] text-white' : 'bg-white border text-gray-700'}`}>📋 Historial de Pedidos ({orderHistory.length})</button>
             </div>
 
@@ -484,6 +538,48 @@
                   </div>
 
                   <button type="submit" className="bg-[#768C77] text-white px-6 py-2.5 rounded-xl font-medium shadow">Guardar Configuración Visual</button>
+                </form>
+              </div>
+            ) : activeTab === 'security' ? (
+              /* PESTAÑA DE CONFIGURACIÓN DE SEGURIDAD Y CLAVES */
+              <div className="bg-white p-6 rounded-2xl border space-y-6 text-xs max-w-xl">
+                <div>
+                  <h3 className="font-serif font-bold text-sm text-gray-800 flex items-center gap-2">
+                    <i className="fa-solid fa-[#768C77] fa-key"></i> Configuración de Credenciales de Acceso
+                  </h3>
+                  <p className="text-gray-500 mt-1">Cambiá tu usuario, tu contraseña y configurá tus canales de recuperación.</p>
+                </div>
+
+                <form onSubmit={handleUpdateCredentials} className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block font-semibold text-gray-700 mb-1">Nuevo Usuario:</label>
+                      <input type="text" value={newAdminUser} onChange={e => setNewAdminUser(e.target.value)} className="w-full p-2 border rounded-xl bg-gray-50" required />
+                    </div>
+
+                    <div>
+                      <label className="block font-semibold text-gray-700 mb-1">Nueva Contraseña:</label>
+                      <input type="text" value={newAdminPass} onChange={e => setNewAdminPass(e.target.value)} className="w-full p-2 border rounded-xl bg-gray-50 font-mono" required />
+                    </div>
+                  </div>
+
+                  <div className="border-t pt-3 space-y-3">
+                    <p className="font-semibold text-gray-800">Canales para Recuperar Contraseña:</p>
+                    
+                    <div>
+                      <label className="block font-medium text-gray-700 mb-1">WhatsApp de Recuperación:</label>
+                      <input type="text" value={newAdminWsp} onChange={e => setNewAdminWsp(e.target.value)} className="w-full p-2 border rounded-xl bg-gray-50" placeholder="3512102238" required />
+                    </div>
+
+                    <div>
+                      <label className="block font-medium text-gray-700 mb-1">Email de Recuperación:</label>
+                      <input type="email" value={newAdminEmail} onChange={e => setNewAdminEmail(e.target.value)} className="w-full p-2 border rounded-xl bg-gray-50" placeholder="luisveron@ejemplo.com" required />
+                    </div>
+                  </div>
+
+                  <button type="submit" className="bg-[#768C77] text-white px-6 py-2.5 rounded-xl font-medium shadow">
+                    Guardar Cambios de Seguridad
+                  </button>
                 </form>
               </div>
             ) : (
