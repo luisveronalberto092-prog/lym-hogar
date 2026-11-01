@@ -31,6 +31,7 @@
     );
 
     function AdminApp() {
+      // Credenciales
       const [authConfig, setAuthConfig] = useState(() => {
         return JSON.parse(localStorage.getItem('lv_admin_credentials')) || {
           user: 'admin',
@@ -45,41 +46,33 @@
       const [pass, setPass] = useState('');
       const [error, setError] = useState('');
       
+      // Recuperación
       const [isRecovering, setIsRecovering] = useState(false);
       const [recoveryMethod, setRecoveryMethod] = useState('wsp');
       const [recoveryInput, setRecoveryInput] = useState('');
       const [recoveryMsg, setRecoveryMsg] = useState('');
 
-      const [activeTab, setActiveTab] = useState('inventory');
+      // Formularios de seguridad
+      const [newAdminUser, setNewAdminUser] = useState(authConfig.user);
+      const [newAdminPass, setNewAdminPass] = useState(authConfig.pass);
+      const [newAdminEmail, setNewAdminEmail] = useState(authConfig.email);
+      const [newAdminWsp, setNewAdminWsp] = useState(authConfig.wsp);
+
+      // Pestañas del admin
+      const [activeTab, setActiveTab] = useState('sales');
       const [products, setProducts] = useState([]);
       const [orderHistory, setOrderHistory] = useState(() => {
-        return JSON.parse(localStorage.getItem('lv_order_history')) || [
-          {
-            id: 'LV-1001',
-            date: new Date().toLocaleDateString('es-AR'),
-            clientName: 'Cliente Ejemplo',
-            clientAddress: 'Malvinas Argentinas 1ra Sección',
-            clientPhone: '3512102238',
-            paymentMethod: 'Efectivo contra entrega',
-            fulfillmentType: 'delivery',
-            deliveryCost: 0,
-            status: 'Entregado',
-            total: 12500,
-            items: [
-              { title: 'Humidificador Ultrasónico', qty: 1, price: 12500, selectedOptions: 'Blanco' }
-            ]
-          }
-        ];
+        return JSON.parse(localStorage.getItem('lv_order_history')) || [];
       });
 
       const [loading, setLoading] = useState(true);
       const [editingId, setEditingId] = useState(null);
       const [msg, setMsg] = useState('');
 
-      // Estado para visualizar / imprimir comprobante
+      // Comprobante activo
       const [selectedReceipt, setSelectedReceipt] = useState(null);
 
-      // Categorías
+      // Categorías dinámicas
       const [categoriesList, setCategoriesList] = useState(() => {
         return JSON.parse(localStorage.getItem('lv_store_categories')) || [
           "Hogar", "Cuidado Personal", "Electrodomésticos", "Bazar y Cocina", "Aromas y Decoración", "Accesorios"
@@ -87,6 +80,7 @@
       });
       const [newCategoryName, setNewCategoryName] = useState('');
 
+      // Configuración de diseño
       const [storeConfig, setStoreConfig] = useState(() => {
         return JSON.parse(localStorage.getItem('lv_store_design')) || {
           brandColor: '#768C77',
@@ -98,6 +92,7 @@
         };
       });
 
+      // Formulario de inventario
       const [form, setForm] = useState({
         title: '', price: '', stock: '10', category: categoriesList[0] || 'Hogar', image: '', video: '', description: '', variants: '', colors: '', specifications: ''
       });
@@ -121,6 +116,31 @@
         }
       }, [isAuth]);
 
+      const handleFileSelection = (e, type) => {
+        const files = Array.from(e.target.files);
+        if (files.length === 0) return;
+
+        if (type === 'main') {
+          const reader = new FileReader();
+          reader.onload = evt => setForm(prev => ({ ...prev, image: evt.target.result }));
+          reader.readAsDataURL(files[0]);
+        } else if (type === 'gallery') {
+          files.forEach(file => {
+            const reader = new FileReader();
+            reader.onload = evt => setAdditionalImages(prev => [...prev, evt.target.result]);
+            reader.readAsDataURL(file);
+          });
+        } else if (type === 'video') {
+          const reader = new FileReader();
+          reader.onload = evt => setForm(prev => ({ ...prev, video: evt.target.result }));
+          reader.readAsDataURL(files[0]);
+        } else if (type === 'bgLogo') {
+          const reader = new FileReader();
+          reader.onload = evt => setStoreConfig(prev => ({ ...prev, bgLogoUrl: evt.target.result }));
+          reader.readAsDataURL(files[0]);
+        }
+      };
+
       const handleLogin = e => {
         e.preventDefault();
         if (user.trim() === authConfig.user && pass.trim() === authConfig.pass) {
@@ -129,6 +149,60 @@
         } else {
           setError('Usuario o contraseña incorrectos.');
         }
+      };
+
+      const handleRecovery = e => {
+        e.preventDefault();
+        const inputClean = recoveryInput.trim().toLowerCase();
+        if (recoveryMethod === 'wsp') {
+          if (inputClean.includes(authConfig.wsp) || authConfig.wsp.includes(inputClean)) {
+            const wspMessage = `¡Hola Luis! Solicitaste la recuperación de acceso a L&V HOGAR.\n\n👤 *Usuario:* ${authConfig.user}\n🔑 *Contraseña:* ${authConfig.pass}`;
+            window.open(`https://wa.me/549${authConfig.wsp}?text=${encodeURIComponent(wspMessage)}`, '_blank');
+            setRecoveryMsg('✅ Te abrimos WhatsApp con tus datos de acceso.');
+          } else {
+            setRecoveryMsg('❌ El número ingresado no coincide con el registrado.');
+          }
+        } else {
+          if (inputClean === authConfig.email.toLowerCase()) {
+            setRecoveryMsg(`✅ Acceso para tu mail: ${authConfig.email}\nUsuario: ${authConfig.user}\nContraseña: ${authConfig.pass}`);
+          } else {
+            setRecoveryMsg('❌ El correo ingresado no coincide con el registrado.');
+          }
+        }
+      };
+
+      const handleUpdateCredentials = e => {
+        e.preventDefault();
+        const updated = {
+          user: newAdminUser.trim(),
+          pass: newAdminPass.trim(),
+          email: newAdminEmail.trim(),
+          wsp: newAdminWsp.trim()
+        };
+        setAuthConfig(updated);
+        localStorage.setItem('lv_admin_credentials', JSON.stringify(updated));
+        setMsg('¡Credenciales de seguridad actualizadas con éxito!');
+        setTimeout(() => setMsg(''), 3000);
+      };
+
+      const handleAddCategory = e => {
+        e.preventDefault();
+        if (!newCategoryName.trim()) return;
+        if (categoriesList.includes(newCategoryName.trim())) { alert('Esa categoría ya existe.'); return; }
+        const updated = [...categoriesList, newCategoryName.trim()];
+        setCategoriesList(updated);
+        localStorage.setItem('lv_store_categories', JSON.stringify(updated));
+        setNewCategoryName('');
+        setMsg('¡Categoría agregada!');
+        setTimeout(() => setMsg(''), 3000);
+      };
+
+      const handleDeleteCategory = (catToDelete) => {
+        if (categoriesList.length <= 1) { alert('Debes mantener al menos una categoría.'); return; }
+        if (!confirm(`¿Eliminar la categoría "${catToDelete}"?`)) return;
+        const updated = categoriesList.filter(c => c !== catToDelete);
+        setCategoriesList(updated);
+        localStorage.setItem('lv_store_categories', JSON.stringify(updated));
       };
 
       const handleUpdateOrderStatus = (orderId, newStatus) => {
@@ -217,6 +291,13 @@
         setAdditionalImages([]);
       };
 
+      const handleSaveDesign = e => {
+        e.preventDefault();
+        localStorage.setItem('lv_store_design', JSON.stringify(storeConfig));
+        setMsg('¡Diseño y calibración guardados!');
+        setTimeout(() => setMsg(''), 3000);
+      };
+
       const totalInventoryValue = products.reduce((acc, p) => acc + (Number(p.price) * Number(p.stock || 0)), 0);
       const totalSalesRevenue = orderHistory.filter(o => o.status !== 'Cancelado').reduce((acc, o) => acc + Number(o.total || 0), 0);
 
@@ -229,18 +310,60 @@
                 <p className="text-xs text-gray-500">Panel de Administración</p>
               </div>
 
-              {error && <p className="text-xs text-red-500 bg-red-50 p-2 rounded text-center">{error}</p>}
-              <form onSubmit={handleLogin} className="space-y-3">
-                <div>
-                  <label className="block text-xs font-semibold mb-1">Usuario</label>
-                  <input type="text" value={user} onChange={e => setUser(e.target.value)} className="w-full p-2.5 border rounded-xl text-xs bg-gray-50" required />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold mb-1">Contraseña</label>
-                  <input type="password" value={pass} onChange={e => setPass(e.target.value)} className="w-full p-2.5 border rounded-xl text-xs bg-gray-50" required />
-                </div>
-                <button type="submit" className="w-full bg-[#768C77] text-white py-2.5 rounded-xl text-xs font-medium shadow">Ingresar</button>
-              </form>
+              {!isRecovering ? (
+                <>
+                  {error && <p className="text-xs text-red-500 bg-red-50 p-2 rounded text-center">{error}</p>}
+                  <form onSubmit={handleLogin} className="space-y-3">
+                    <div>
+                      <label className="block text-xs font-semibold mb-1">Usuario</label>
+                      <input type="text" value={user} onChange={e => setUser(e.target.value)} className="w-full p-2.5 border rounded-xl text-xs bg-gray-50" required />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold mb-1">Contraseña</label>
+                      <input type="password" value={pass} onChange={e => setPass(e.target.value)} className="w-full p-2.5 border rounded-xl text-xs bg-gray-50" required />
+                    </div>
+                    <button type="submit" className="w-full bg-[#768C77] text-white py-2.5 rounded-xl text-xs font-medium shadow">Ingresar</button>
+                  </form>
+                  <div className="text-center pt-2 space-y-1">
+                    <button onClick={() => { setIsRecovering(true); setRecoveryMsg(''); }} className="text-xs text-[#768C77] underline hover:font-bold">¿Olvidaste tu contraseña?</button>
+                    <a href="index.html" className="block text-xs text-gray-400 underline">Volver a la tienda</a>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="text-center text-xs text-gray-600">
+                    <p className="font-semibold mb-1">Recuperar Acceso</p>
+                    <p>Elegí dónde recibir tus datos:</p>
+                  </div>
+
+                  <div className="flex gap-2 text-xs">
+                    <button type="button" onClick={() => setRecoveryMethod('wsp')} className={`w-1/2 p-2 rounded-xl border font-medium ${recoveryMethod === 'wsp' ? 'bg-[#25D366] text-white border-[#25D366]' : 'bg-gray-50'}`}>💬 WhatsApp</button>
+                    <button type="button" onClick={() => setRecoveryMethod('email')} className={`w-1/2 p-2 rounded-xl border font-medium ${recoveryMethod === 'email' ? 'bg-[#768C77] text-white border-[#768C77]' : 'bg-gray-50'}`}>✉️ Email</button>
+                  </div>
+
+                  {recoveryMsg && <div className="text-xs p-2.5 rounded bg-gray-50 border text-center font-medium whitespace-pre-line">{recoveryMsg}</div>}
+                  
+                  <form onSubmit={handleRecovery} className="space-y-3">
+                    <div>
+                      <label className="block text-xs font-semibold mb-1">
+                        {recoveryMethod === 'wsp' ? 'Tu WhatsApp (ej: 3512102238):' : 'Tu Email:'}
+                      </label>
+                      <input 
+                        type={recoveryMethod === 'wsp' ? 'text' : 'email'} 
+                        placeholder={recoveryMethod === 'wsp' ? '3512102238' : 'tu-email@gmail.com'} 
+                        value={recoveryInput} 
+                        onChange={e => setRecoveryInput(e.target.value)} 
+                        className="w-full p-2.5 border rounded-xl text-xs bg-gray-50" 
+                        required 
+                      />
+                    </div>
+                    <button type="submit" className="w-full bg-[#768C77] text-white py-2.5 rounded-xl text-xs font-medium shadow">
+                      Enviar Acceso
+                    </button>
+                  </form>
+                  <button onClick={() => { setIsRecovering(false); setRecoveryMsg(''); }} className="w-full text-xs text-gray-500 underline text-center pt-2">Volver al Login</button>
+                </>
+              )}
             </div>
           </div>
         );
@@ -285,10 +408,13 @@
               </div>
             </div>
 
+            {/* PESTAÑAS COMPLETAS UNIFICADAS */}
             <div className="flex gap-2 border-b pb-2 overflow-x-auto">
-              <button onClick={() => setActiveTab('sales')} className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap ${activeTab === 'sales' ? 'bg-[#768C77] text-white' : 'bg-white border text-gray-700'}`}>📊 Control de Ventas & Comprobantes</button>
-              <button onClick={() => setActiveTab('inventory')} className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap ${activeTab === 'inventory' ? 'bg-[#768C77] text-white' : 'bg-white border text-gray-700'}`}>📦 Inventario Productos</button>
+              <button onClick={() => setActiveTab('sales')} className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap ${activeTab === 'sales' ? 'bg-[#768C77] text-white' : 'bg-white border text-gray-700'}`}>📊 Ventas & Comprobantes</button>
+              <button onClick={() => setActiveTab('inventory')} className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap ${activeTab === 'inventory' ? 'bg-[#768C77] text-white' : 'bg-white border text-gray-700'}`}>📦 Inventario</button>
               <button onClick={() => setActiveTab('categories')} className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap ${activeTab === 'categories' ? 'bg-[#768C77] text-white' : 'bg-white border text-gray-700'}`}>🏷️ Pestañas</button>
+              <button onClick={() => setActiveTab('design')} className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap ${activeTab === 'design' ? 'bg-[#768C77] text-white' : 'bg-white border text-gray-700'}`}>🎨 Diseño & Fondo</button>
+              <button onClick={() => setActiveTab('security')} className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap ${activeTab === 'security' ? 'bg-[#768C77] text-white' : 'bg-white border text-gray-700'}`}>🔐 Seguridad</button>
             </div>
 
             {activeTab === 'sales' ? (
@@ -308,7 +434,7 @@
                           <th className="p-2">ID</th>
                           <th className="p-2">Fecha</th>
                           <th className="p-2">Cliente</th>
-                          <th className="p-2">Método Pago</th>
+                          <th className="p-2">Pago</th>
                           <th className="p-2">Total</th>
                           <th className="p-2">Estado</th>
                           <th className="p-2 text-right">Comprobante / Acciones</th>
@@ -359,6 +485,7 @@
                       <label className="block font-medium mb-1">Título</label>
                       <input type="text" value={form.title} onChange={e => setForm({...form, title: e.target.value})} className="w-full p-2 border rounded-xl bg-gray-50" required />
                     </div>
+
                     <div className="grid grid-cols-2 gap-2">
                       <div>
                         <label className="block font-medium mb-1">Categoría</label>
@@ -371,6 +498,7 @@
                         <input type="number" value={form.price} onChange={e => setForm({...form, price: e.target.value})} className="w-full p-2 border rounded-xl bg-gray-50 font-bold" required />
                       </div>
                     </div>
+
                     <div className="grid grid-cols-2 gap-2">
                       <div>
                         <label className="block font-medium mb-1">Stock</label>
@@ -378,141 +506,21 @@
                       </div>
                       <div>
                         <label className="block font-medium mb-1">Talles / Medidas</label>
-                        <input type="text" value={form.variants} onChange={e => setForm({...form, variants: e.target.value})} className="w-full p-2 border rounded-xl bg-gray-50" />
+                        <input type="text" placeholder="Ej: S, M, L" value={form.variants} onChange={e => setForm({...form, variants: e.target.value})} className="w-full p-2 border rounded-xl bg-gray-50" />
                       </div>
                     </div>
-                    <button type="submit" className="w-full bg-[#768C77] text-white py-2.5 rounded-xl font-medium shadow">Guardar Producto</button>
-                  </form>
-                </div>
 
-                <div className="bg-white p-5 rounded-2xl border space-y-3 text-xs md:col-span-2">
-                  <h3 className="font-serif font-bold text-sm">Inventario en Supabase ({products.length})</h3>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left">
-                      <thead>
-                        <tr className="border-b bg-gray-50 text-gray-600">
-                          <th className="p-2">Foto</th>
-                          <th className="p-2">Título</th>
-                          <th className="p-2">Precio</th>
-                          <th className="p-2">Stock</th>
-                          <th className="p-2 text-right">Acciones</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {products.map(p => (
-                          <tr key={p.id} className="border-b hover:bg-gray-50">
-                            <td className="p-2"><img src={p.image} className="w-8 h-8 object-cover rounded border" /></td>
-                            <td className="p-2 font-semibold">{p.title}</td>
-                            <td className="p-2 font-bold text-[#768C77]">${Number(p.price).toLocaleString('es-AR')}</td>
-                            <td className="p-2">{p.stock} un.</td>
-                            <td className="p-2 text-right space-x-2">
-                              <button onClick={() => handleEdit(p)} className="text-blue-500"><i className="fa-solid fa-pen"></i></button>
-                              <button onClick={() => handleDelete(p.id)} className="text-red-400"><i className="fa-solid fa-trash"></i></button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </div>
-            ) : null}
-          </main>
-
-          {/* MODAL / PLANTILLA DE COMPROBANTE DE COMPRA IMPRIMIBLE */}
-          {selectedReceipt && (
-            <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4 overflow-y-auto">
-              <div className="bg-white max-w-md w-full p-6 rounded-2xl shadow-2xl relative space-y-4" id="printable-receipt">
-                
-                {/* Encabezado Ticket */}
-                <div className="text-center border-b pb-3">
-                  <h2 className="font-serif text-xl font-bold tracking-widest text-gray-800">L&V HOGAR</h2>
-                  <p className="text-[10px] text-gray-500 uppercase">Comprobante de Venta no Válido como Factura Fiscal</p>
-                  <p className="text-[11px] text-gray-600 mt-1">Malvinas Argentinas, Córdoba</p>
-                  <p className="text-[11px] text-gray-600">WhatsApp: 3512102238</p>
-                </div>
-
-                {/* Detalles Operación */}
-                <div className="text-xs space-y-1 bg-gray-50 p-3 rounded-xl border">
-                  <div className="flex justify-between font-mono font-bold">
-                    <span>Comprobante N°:</span>
-                    <span>{selectedReceipt.id}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Fecha:</span>
-                    <span>{selectedReceipt.date}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Cliente:</span>
-                    <span>{selectedReceipt.clientName || 'Consumidor Final'}</span>
-                  </div>
-                  {selectedReceipt.clientAddress && (
-                    <div className="flex justify-between">
-                      <span>Dirección:</span>
-                      <span>{selectedReceipt.clientAddress}</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between">
-                    <span>Forma de Pago:</span>
-                    <span>{selectedReceipt.paymentMethod || 'Efectivo'}</span>
-                  </div>
-                </div>
-
-                {/* Tabla de Artículos */}
-                <div className="space-y-2 text-xs">
-                  <p className="font-bold border-b pb-1">Detalle del Pedido:</p>
-                  {selectedReceipt.items && selectedReceipt.items.map((it, idx) => (
-                    <div key={idx} className="flex justify-between items-center text-[11px] border-b pb-1">
+                    <div className="grid grid-cols-2 gap-2">
                       <div>
-                        <p className="font-semibold">{it.title}</p>
-                        {it.selectedOptions && <p className="text-[9px] text-gray-400">[{it.selectedOptions}]</p>}
+                        <label className="block font-medium mb-1">Colores / Modelos</label>
+                        <input type="text" placeholder="Ej: Rojo, Negro" value={form.colors} onChange={e => setForm({...form, colors: e.target.value})} className="w-full p-2 border rounded-xl bg-gray-50" />
                       </div>
-                      <div className="text-right font-mono">
-                        <span>{it.qty} x ${Number(it.price).toLocaleString('es-AR')}</span>
-                        <p className="font-bold text-gray-800">${Number(it.price * it.qty).toLocaleString('es-AR')}</p>
+                      <div>
+                        <label className="block font-medium mb-1">Especificaciones</label>
+                        <input type="text" placeholder="Ej: Acero, 220V" value={form.specifications} onChange={e => setForm({...form, specifications: e.target.value})} className="w-full p-2 border rounded-xl bg-gray-50" />
                       </div>
                     </div>
-                  ))}
-                </div>
 
-                {/* Totales */}
-                <div className="border-t pt-2 space-y-1 text-xs">
-                  {selectedReceipt.deliveryCost > 0 && (
-                    <div className="flex justify-between text-gray-500">
-                      <span>Costo de Envío:</span>
-                      <span>${Number(selectedReceipt.deliveryCost).toLocaleString('es-AR')}</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between text-sm font-bold text-[#768C77]">
-                    <span>Total Abonado:</span>
-                    <span>${Number(selectedReceipt.total).toLocaleString('es-AR')}</span>
-                  </div>
-                </div>
-
-                {/* Pie Comprobante */}
-                <div className="text-center pt-2 text-[10px] text-gray-400 border-t">
-                  <p>¡Muchas gracias por tu compra en L&V HOGAR!</p>
-                </div>
-
-                {/* Botones no imprimibles */}
-                <div className="flex gap-2 pt-2 no-print">
-                  <button onClick={() => window.print()} className="w-1/2 bg-[#768C77] text-white py-2 rounded-xl text-xs font-medium">
-                    🖨️ Imprimir Ticket
-                  </button>
-                  <button onClick={() => setSelectedReceipt(null)} className="w-1/2 bg-gray-200 text-gray-700 py-2 rounded-xl text-xs font-medium">
-                    Cerrar
-                  </button>
-                </div>
-
-              </div>
-            </div>
-          )}
-
-        </div>
-      );
-    }
-
-    ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(AdminApp));
-  </script>
-</body>
-</html>
+                    <div className="bg-gray-50 p-2 rounded-xl border space-y-1">
+                      <label className="block font-medium text-gray-700">📸 Foto Principal:</label>
+                      <input type="file" accept="image/*" onChange={e => handleFileSelection(e, 'main')} className="w-full text-[10px]" />
