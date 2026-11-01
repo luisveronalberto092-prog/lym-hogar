@@ -11,7 +11,11 @@
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <style>
+    body { font-family: 'Plus Jakarta Sans', sans-serif; }
+    h1, h2, h3, .font-serif-custom { font-family: 'Outfit', sans-serif; }
+    .num-style { font-variant-numeric: tabular-nums; letter-spacing: -0.025em; }
     @media print {
       body * { visibility: hidden; }
       #printable-receipt, #printable-receipt * { visibility: visible; }
@@ -20,7 +24,7 @@
     }
   </style>
 </head>
-<body class="bg-[#FAFAF7] text-gray-800 font-sans">
+<body class="bg-[#FAFAF7] text-gray-800">
   <div id="root"></div>
 
   <script type="text/babel">
@@ -324,7 +328,7 @@
           <div className="min-h-screen flex items-center justify-center p-4 bg-gray-100">
             <div className="bg-white p-8 rounded-2xl shadow-lg border w-full max-w-sm space-y-4">
               <div className="text-center">
-                <h2 className="text-xl font-serif font-bold text-gray-800">L&V HOGAR</h2>
+                <h2 className="text-xl font-serif-custom font-bold text-gray-800">L&V HOGAR</h2>
                 <p className="text-xs text-gray-500">Panel de Administración</p>
               </div>
 
@@ -371,7 +375,7 @@
                         placeholder={recoveryMethod === 'wsp' ? '3512102238' : 'tu-email@gmail.com'} 
                         value={recoveryInput} 
                         onChange={e => setRecoveryInput(e.target.value)} 
-                        className="w-full p-2.5 border rounded-xl text-xs bg-gray-50" 
+                        className="w-full p-2.5 border rounded-xl text-xs bg-gray-50 num-style" 
                         required 
                       />
                     </div>
@@ -390,7 +394,7 @@
       return (
         <div className="min-h-screen flex flex-col">
           <header className="bg-[#1C1F1D] text-white p-4 flex justify-between items-center text-xs no-print">
-            <span className="font-serif font-bold text-[#C8B297]">L&V HOGAR | Panel Admin</span>
+            <span className="font-serif-custom font-bold text-[#C8B297] tracking-wider">L&V HOGAR | Panel Admin</span>
             <div className="space-x-4">
               <a href="index.html" target="_blank" className="text-[#C8B297] underline">Ver Tienda</a>
               <button onClick={() => setIsAuth(false)} className="text-red-400">Salir</button>
@@ -404,7 +408,7 @@
               <div className="bg-white p-4 rounded-2xl border shadow-sm flex items-center justify-between">
                 <div>
                   <p className="text-gray-400 uppercase font-semibold">Recaudación Total</p>
-                  <h4 className="text-2xl font-serif font-bold text-[#768C77] mt-1">${totalSalesRevenue.toLocaleString('es-AR')}</h4>
+                  <h4 className="text-2xl font-serif-custom font-bold text-[#768C77] mt-1 num-style">${totalSalesRevenue.toLocaleString('es-AR')}</h4>
                 </div>
                 <div className="w-10 h-10 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center text-base"><i className="fa-solid fa-receipt"></i></div>
               </div>
@@ -412,7 +416,7 @@
               <div className="bg-white p-4 rounded-2xl border shadow-sm flex items-center justify-between">
                 <div>
                   <p className="text-gray-400 uppercase font-semibold">Total de Pedidos</p>
-                  <h4 className="text-2xl font-serif font-bold text-gray-800 mt-1">{orderHistory.length}</h4>
+                  <h4 className="text-2xl font-serif-custom font-bold text-gray-800 mt-1 num-style">{orderHistory.length}</h4>
                 </div>
                 <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-800 flex items-center justify-center text-base"><i className="fa-solid fa-cart-shopping"></i></div>
               </div>
@@ -420,7 +424,7 @@
               <div className="bg-white p-4 rounded-2xl border shadow-sm flex items-center justify-between">
                 <div>
                   <p className="text-gray-400 uppercase font-semibold">Valor del Inventario</p>
-                  <h4 className="text-2xl font-serif font-bold text-gray-800 mt-1">${totalInventoryValue.toLocaleString('es-AR')}</h4>
+                  <h4 className="text-2xl font-serif-custom font-bold text-gray-800 mt-1 num-style">${totalInventoryValue.toLocaleString('es-AR')}</h4>
                 </div>
                 <div className="w-10 h-10 rounded-full bg-[#768C77]/10 text-[#768C77] flex items-center justify-center text-base"><i className="fa-solid fa-boxes-stacked"></i></div>
               </div>
@@ -437,7 +441,7 @@
             {activeTab === 'sales' && (
               <div className="bg-white p-5 rounded-2xl border space-y-4 text-xs">
                 <div className="flex justify-between items-center">
-                  <h3 className="font-serif font-bold text-sm text-gray-800">Historial de Ventas & Emisión de Comprobantes</h3>
+                  <h3 className="font-serif-custom font-bold text-sm text-gray-800">Historial de Ventas & Emisión de Comprobantes</h3>
                   <span className="text-gray-400">Total: {orderHistory.length} registros</span>
                 </div>
 
@@ -464,7 +468,7 @@
                             <td className="p-2 text-gray-500">{ord.date}</td>
                             <td className="p-2 font-medium">{ord.clientName || 'Cliente Web'}</td>
                             <td className="p-2 text-gray-600">{ord.paymentMethod || 'Efectivo'}</td>
-                            <td className="p-2 font-bold text-gray-800">${Number(ord.total).toLocaleString('es-AR')}</td>
+                            <td className="p-2 font-bold text-gray-800 num-style">${Number(ord.total).toLocaleString('es-AR')}</td>
                             <td className="p-2">
                               <select 
                                 value={ord.status || 'Pendiente'} 
@@ -499,7 +503,7 @@
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="bg-white p-5 rounded-2xl border space-y-3 text-xs">
                   <div className="flex justify-between items-center">
-                    <h3 className="font-serif font-bold text-sm">{editingId ? '✏️ Editar Producto' : '📦 Cargar Producto'}</h3>
+                    <h3 className="font-serif-custom font-bold text-sm">{editingId ? '✏️ Editar Producto' : '📦 Cargar Producto'}</h3>
                     {editingId && <button onClick={resetForm} className="text-gray-400 underline">Cancelar</button>}
                   </div>
 
@@ -518,14 +522,14 @@
                       </div>
                       <div>
                         <label className="block font-medium mb-1">Precio ($)</label>
-                        <input type="number" value={form.price} onChange={e => setForm({...form, price: e.target.value})} className="w-full p-2 border rounded-xl bg-gray-50 font-bold" required />
+                        <input type="number" value={form.price} onChange={e => setForm({...form, price: e.target.value})} className="w-full p-2 border rounded-xl bg-gray-50 font-bold num-style" required />
                       </div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-2">
                       <div>
                         <label className="block font-medium mb-1">Stock</label>
-                        <input type="number" value={form.stock} onChange={e => setForm({...form, stock: e.target.value})} className="w-full p-2 border rounded-xl bg-gray-50" required />
+                        <input type="number" value={form.stock} onChange={e => setForm({...form, stock: e.target.value})} className="w-full p-2 border rounded-xl bg-gray-50 num-style" required />
                       </div>
                       <div>
                         <label className="block font-medium mb-1">Talles / Medidas</label>
@@ -582,7 +586,7 @@
                 </div>
 
                 <div className="bg-white p-5 rounded-2xl border space-y-3 text-xs md:col-span-2">
-                  <h3 className="font-serif font-bold text-sm">Inventario en Supabase ({products.length})</h3>
+                  <h3 className="font-serif-custom font-bold text-sm">Inventario en Supabase ({products.length})</h3>
                   {loading ? (
                     <p className="text-center py-10 text-gray-400">Cargando...</p>
                   ) : products.length === 0 ? (
@@ -606,8 +610,8 @@
                               <td className="p-2"><img src={p.image} className="w-8 h-8 object-cover rounded border" /></td>
                               <td className="p-2 font-semibold">{p.title}</td>
                               <td className="p-2 text-gray-500">{p.category}</td>
-                              <td className="p-2 font-bold text-[#768C77]">${Number(p.price).toLocaleString('es-AR')}</td>
-                              <td className="p-2"><span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${Number(p.stock) > 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}`}>{p.stock} un.</span></td>
+                              <td className="p-2 font-bold text-[#768C77] num-style">${Number(p.price).toLocaleString('es-AR')}</td>
+                              <td className="p-2"><span className={`px-2 py-0.5 rounded-full text-[10px] font-bold num-style ${Number(p.stock) > 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}`}>{p.stock} un.</span></td>
                               <td className="p-2 text-right space-x-2">
                                 <button onClick={() => handleEdit(p)} className="text-blue-500" title="Editar"><i className="fa-solid fa-pen"></i></button>
                                 <button onClick={() => handleDelete(p.id)} className="text-red-400" title="Eliminar"><i className="fa-solid fa-trash"></i></button>
@@ -625,7 +629,7 @@
             {activeTab === 'categories' && (
               <div className="bg-white p-6 rounded-2xl border space-y-6 text-xs max-w-xl">
                 <div>
-                  <h3 className="font-serif font-bold text-sm text-gray-800 flex items-center gap-2">
+                  <h3 className="font-serif-custom font-bold text-sm text-gray-800 flex items-center gap-2">
                     <i className="fa-solid fa-tags text-[#768C77]"></i> Gestor de Pestañas y Categorías
                   </h3>
                   <p className="text-gray-500 mt-1">Agregá nuevas pestañas o eliminá las que ya no uses en tu tienda.</p>
@@ -664,7 +668,7 @@
             {activeTab === 'design' && (
               <div className="bg-white p-6 rounded-2xl border space-y-6 text-xs">
                 <div>
-                  <h3 className="font-serif font-bold text-sm text-gray-800 flex items-center gap-2">
+                  <h3 className="font-serif-custom font-bold text-sm text-gray-800 flex items-center gap-2">
                     <i className="fa-solid fa-sliders text-[#768C77]"></i> Calibrador de Fondo de Pantalla (Logo de Marca)
                   </h3>
                   <p className="text-gray-500 mt-1">Subí tu logo y ajustá la transparencia y el tamaño para que aparezca como marca de agua en la tienda.</p>
@@ -716,7 +720,7 @@
             {activeTab === 'security' && (
               <div className="bg-white p-6 rounded-2xl border space-y-6 text-xs max-w-xl">
                 <div>
-                  <h3 className="font-serif font-bold text-sm text-gray-800 flex items-center gap-2">
+                  <h3 className="font-serif-custom font-bold text-sm text-gray-800 flex items-center gap-2">
                     <i className="fa-solid fa-key text-[#768C77]"></i> Configuración de Credenciales de Acceso
                   </h3>
                   <p className="text-gray-500 mt-1">Cambiá tu usuario, tu contraseña y configurá tus canales de recuperación.</p>
@@ -740,7 +744,7 @@
                     
                     <div>
                       <label className="block font-medium text-gray-700 mb-1">WhatsApp de Recuperación:</label>
-                      <input type="text" value={newAdminWsp} onChange={e => setNewAdminWsp(e.target.value)} className="w-full p-2 border rounded-xl bg-gray-50" placeholder="3512102238" required />
+                      <input type="text" value={newAdminWsp} onChange={e => setNewAdminWsp(e.target.value)} className="w-full p-2 border rounded-xl bg-gray-50 num-style" placeholder="3512102238" required />
                     </div>
 
                     <div>
@@ -762,10 +766,10 @@
               <div className="bg-white max-w-md w-full p-6 rounded-2xl shadow-2xl relative space-y-4" id="printable-receipt">
                 
                 <div className="text-center border-b pb-3">
-                  <h2 className="font-serif text-xl font-bold tracking-widest text-gray-800">L&V HOGAR</h2>
+                  <h2 className="font-serif-custom text-xl font-bold tracking-widest text-gray-800">L&V HOGAR</h2>
                   <p className="text-[10px] text-gray-500 uppercase">Comprobante de Venta no Válido como Factura Fiscal</p>
                   <p className="text-[11px] text-gray-600 mt-1">Malvinas Argentinas, Córdoba</p>
-                  <p className="text-[11px] text-gray-600">WhatsApp: 3512102238</p>
+                  <p className="text-[11px] text-gray-600 num-style">WhatsApp: 3512102238</p>
                 </div>
 
                 <div className="text-xs space-y-1 bg-gray-50 p-3 rounded-xl border">
@@ -775,7 +779,7 @@
                   </div>
                   <div className="flex justify-between">
                     <span>Fecha:</span>
-                    <span>{selectedReceipt.date}</span>
+                    <span className="num-style">{selectedReceipt.date}</span>
                   </div>
                   <div className="flex justify-between">
                     <span>Cliente:</span>
@@ -801,7 +805,7 @@
                         <p className="font-semibold">{it.title}</p>
                         {it.selectedOptions && <p className="text-[9px] text-gray-400">[{it.selectedOptions}]</p>}
                       </div>
-                      <div className="text-right font-mono">
+                      <div className="text-right font-mono num-style">
                         <span>{it.qty} x ${Number(it.price).toLocaleString('es-AR')}</span>
                         <p className="font-bold text-gray-800">${Number(it.price * it.qty).toLocaleString('es-AR')}</p>
                       </div>
@@ -809,7 +813,7 @@
                   ))}
                 </div>
 
-                <div className="border-t pt-2 space-y-1 text-xs">
+                <div className="border-t pt-2 space-y-1 text-xs num-style">
                   {selectedReceipt.deliveryCost > 0 && (
                     <div className="flex justify-between text-gray-500">
                       <span>Costo de Envío:</span>
@@ -843,7 +847,6 @@
       );
     }
 
-    // CORREGIDO: Se agregó "document." para que cargue correctamente en el navegador
     ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(AdminApp));
   </script>
 </body>
