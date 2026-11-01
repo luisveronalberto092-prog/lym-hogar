@@ -81,7 +81,6 @@
         ];
       });
 
-      // Estado para la Planilla de Carga de Mercadería y Costos (con Costo ARS directo)
       const [costSheet, setCostSheet] = useState(() => {
         return JSON.parse(localStorage.getItem('lv_cost_sheet')) || [];
       });
@@ -89,6 +88,7 @@
       const [costForm, setCostForm] = useState({
         date: new Date().toISOString().split('T')[0],
         itemTitle: '',
+        category: 'Hogar',
         qty: '',
         costUsd: '',
         dolarRate: '',
@@ -257,7 +257,6 @@
         localStorage.setItem('lv_order_history', JSON.stringify(updated));
       };
 
-      // Guardar ítem en la Hoja de Cálculo de Costos (con soporte ARS directo)
       const handleAddCostItem = e => {
         e.preventDefault();
         if (!costForm.itemTitle || !costForm.qty || !costForm.salePriceArs) {
@@ -268,14 +267,13 @@
         const costUsd = parseFloat(costForm.costUsd) || 0;
         const dolarRate = parseFloat(costForm.dolarRate) || 0;
         const costArsDirect = parseFloat(costForm.costArsDirect) || 0;
-
-        // Si cargó costo en USD y Dólar, se calcula; si no, toma el costo ARS directo
         const finalUnitCostArs = (costUsd > 0 && dolarRate > 0) ? (costUsd * dolarRate) : costArsDirect;
 
         const newItem = {
           id: Date.now(),
           date: costForm.date,
           itemTitle: costForm.itemTitle.trim(),
+          category: costForm.category,
           qty: parseInt(costForm.qty),
           costUsd: costUsd,
           dolarRate: dolarRate,
@@ -291,13 +289,14 @@
         setCostForm({
           date: new Date().toISOString().split('T')[0],
           itemTitle: '',
+          category: categoriesList[0] || 'Hogar',
           qty: '',
           costUsd: '',
           dolarRate: '',
           costArsDirect: '',
           salePriceArs: ''
         });
-        setMsg('¡Registro de mercadería agregado a la planilla!');
+        setMsg('¡Registro agregado a la planilla!');
         setTimeout(() => setMsg(''), 3000);
       };
 
@@ -306,6 +305,48 @@
         const updatedSheet = costSheet.filter(item => item.id !== id);
         setCostSheet(updatedSheet);
         localStorage.setItem('lv_cost_sheet', JSON.stringify(updatedSheet));
+      };
+
+      // NUEVO: Enviar ítem de la planilla directamente a la tienda (Supabase)
+      const handleSyncItemToStore = async (item) => {
+        try {
+          // Buscamos si ya existe un producto con el mismo título en Supabase
+          const existing = products.find(p => p.title.toLowerCase() === item.itemTitle.toLowerCase());
+
+          if (existing) {
+            // Si ya existe, actualizamos stock sumando las nuevas unidades y actualizamos el precio
+            const newStock = Number(existing.stock || 0) + Number(item.qty);
+            const { error } = await supabaseClient.from('productos').update({
+              price: item.salePriceArs,
+              stock: newStock
+            }).eq('id', existing.id);
+
+            if (error) throw error;
+            setMsg(`¡Producto "${item.itemTitle}" actualizado en la tienda! (Stock sumado: +${item.qty})`);
+          } else {
+            // Si no existe, lo creamos como nuevo producto en Supabase
+            const payload = {
+              title: item.itemTitle,
+              price: item.salePriceArs,
+              stock: item.qty,
+              category: item.category || categoriesList[0],
+              image: 'https://images.unsplash.com/photo-1583847268964-b28dc8f51f92?auto=format&fit=crop&w=600&q=80',
+              description: 'Cargado desde Planilla de Costos',
+              variants: '',
+              colors: '',
+              specifications: ''
+            };
+
+            const { error } = await supabaseClient.from('productos').insert([payload]);
+            if (error) throw error;
+            setMsg(`¡Nuevo producto "${item.itemTitle}" publicado en la tienda con éxito!`);
+          }
+
+          fetchProducts();
+          setTimeout(() => setMsg(''), 4000);
+        } catch (err) {
+          alert('Error al sincronizar con la tienda: ' + err.message);
+        }
       };
 
       const handleSave = async e => {
@@ -566,38 +607,44 @@
               </div>
             )}
 
-            {/* PLANILLA DE CARGA DE MERCADERÍA Y COSTOS CON PESOS ARGENTINOS */}
+            {/* PLANILLA DE CARGA DE MERCADERÍA CONECTADA A TIENDA */}
             {activeTab === 'costsheet' && (
               <div className="space-y-6">
                 <div className="bg-white p-6 rounded-2xl border space-y-4 text-xs">
                   <div>
-                    <h3 className="font-serif-custom font-bold text-sm text-gray-800">📋 Carga de Mercadería (Costos en USD, Dólar o Pesos ARS directos)</h3>
-                    <p className="text-gray-500 mt-1">Podés calcular el costo unitario mediante USD y Cotización del Dólar, o ingresar directamente el Costo en Pesos ($). Todo se calcula automáticamente.</p>
+                    <h3 className="font-serif-custom font-bold text-sm text-gray-800">📋 Carga de Mercadería (Con conexión directa al Stock de la Tienda)</h3>
+                    <p className="text-gray-500 mt-1">Registrá tus costos y precios. Luego, hacé clic en <b>"Sincronizar a Tienda"</b> en cualquier fila para publicar o actualizar automáticamente el stock y precio en Supabase.</p>
                   </div>
 
-                  <form onSubmit={handleAddCostItem} className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-7 gap-3 items-end">
+                  <form onSubmit={handleAddCostItem} className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-8 gap-3 items-end">
                     <div>
                       <label className="block font-semibold mb-1 text-gray-700">Fecha:</label>
                       <input type="date" value={costForm.date} onChange={e => setCostForm({...costForm, date: e.target.value})} className="w-full p-2 border rounded-xl bg-gray-50 num-style" required />
                     </div>
                     <div>
-                      <label className="block font-semibold mb-1 text-gray-700">Artículo / Mercadería:</label>
+                      <label className="block font-semibold mb-1 text-gray-700">Artículo:</label>
                       <input type="text" placeholder="Ej: Humidificador" value={costForm.itemTitle} onChange={e => setCostForm({...costForm, itemTitle: e.target.value})} className="w-full p-2 border rounded-xl bg-gray-50" required />
+                    </div>
+                    <div>
+                      <label className="block font-semibold mb-1 text-gray-700">Categoría:</label>
+                      <select value={costForm.category} onChange={e => setCostForm({...costForm, category: e.target.value})} className="w-full p-2 border rounded-xl bg-gray-50">
+                        {categoriesList.map(c => <option key={c} value={c}>{c}</option>)}
+                      </select>
                     </div>
                     <div>
                       <label className="block font-semibold mb-1 text-gray-700">Unidades:</label>
                       <input type="number" placeholder="Ej: 10" value={costForm.qty} onChange={e => setCostForm({...costForm, qty: e.target.value})} className="w-full p-2 border rounded-xl bg-gray-50 num-style" required />
                     </div>
                     <div>
-                      <label className="block font-semibold mb-1 text-gray-700">Costo USD ($) o <span className="text-[#768C77]">Costo ARS ($ directo)</span>:</label>
+                      <label className="block font-semibold mb-1 text-gray-700">Costo USD / <span className="text-[#768C77]">ARS $</span>:</label>
                       <div className="grid grid-cols-2 gap-1">
                         <input type="number" step="0.01" placeholder="USD" value={costForm.costUsd} onChange={e => setCostForm({...costForm, costUsd: e.target.value})} className="w-full p-2 border rounded-xl bg-gray-50 num-style" />
-                        <input type="number" step="0.01" placeholder="ARS $" value={costForm.costArsDirect} onChange={e => setCostForm({...costForm, costArsDirect: e.target.value})} className="w-full p-2 border rounded-xl bg-gray-50 num-style font-bold text-[#768C77]" />
+                        <input type="number" step="0.01" placeholder="ARS" value={costForm.costArsDirect} onChange={e => setCostForm({...costForm, costArsDirect: e.target.value})} className="w-full p-2 border rounded-xl bg-gray-50 num-style font-bold text-[#768C77]" />
                       </div>
                     </div>
                     <div>
-                      <label className="block font-semibold mb-1 text-gray-700">Cotiz. Dólar ($):</label>
-                      <input type="number" step="0.01" placeholder="Ej: 1250 (si usas USD)" value={costForm.dolarRate} onChange={e => setCostForm({...costForm, dolarRate: e.target.value})} className="w-full p-2 border rounded-xl bg-gray-50 num-style" />
+                      <label className="block font-semibold mb-1 text-gray-700">Cotiz. Dólar:</label>
+                      <input type="number" step="0.01" placeholder="Ej: 1250" value={costForm.dolarRate} onChange={e => setCostForm({...costForm, dolarRate: e.target.value})} className="w-full p-2 border rounded-xl bg-gray-50 num-style" />
                     </div>
                     <div>
                       <label className="block font-semibold mb-1 text-gray-700">Precio Venta Unit. ($):</label>
@@ -613,7 +660,7 @@
 
                 <div className="bg-white p-6 rounded-2xl border space-y-4 text-xs">
                   <div className="flex justify-between items-center">
-                    <h3 className="font-serif-custom font-bold text-sm text-gray-800">📊 Planilla General de Ingresos, Costos y Precios en Pesos</h3>
+                    <h3 className="font-serif-custom font-bold text-sm text-gray-800">📊 Planilla General y Sincronización de Stock</h3>
                     <span className="text-gray-400">Total Registros: {costSheet.length}</span>
                   </div>
 
@@ -625,14 +672,14 @@
                         <thead>
                           <tr className="border-b bg-gray-100 text-gray-700 font-bold">
                             <th className="p-2.5">Fecha</th>
-                            <th className="p-2.5">Artículo</th>
+                            <th className="p-2.5">Artículo / Cat.</th>
                             <th className="p-2.5 text-center">Unidades</th>
-                            <th className="p-2.5 text-right">Costo USD / Dólar</th>
-                            <th className="p-2.5 text-right text-[#768C77]">Costo Unit. ARS ($)</th>
-                            <th className="p-2.5 text-right text-[#768C77]">Costo Total ARS ($)</th>
+                            <th className="p-2.5 text-right">Costo Unit. ARS ($)</th>
+                            <th className="p-2.5 text-right">Costo Total ARS ($)</th>
                             <th className="p-2.5 text-right text-blue-700">Venta Unit. ARS ($)</th>
                             <th className="p-2.5 text-right text-blue-700">Venta Total ARS ($)</th>
-                            <th className="p-2.5 text-center">Acción</th>
+                            <th className="p-2.5 text-center">Sincronizar Tienda</th>
+                            <th className="p-2.5 text-center">Eliminar</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -644,15 +691,24 @@
                             return (
                               <tr key={item.id} className="border-b hover:bg-gray-50 num-style">
                                 <td className="p-2.5 text-gray-500">{item.date}</td>
-                                <td className="p-2.5 font-bold text-gray-800">{item.itemTitle}</td>
-                                <td className="p-2.5 text-center font-semibold">{item.qty}</td>
-                                <td className="p-2.5 text-right text-gray-600">
-                                  {item.costUsd > 0 ? `$${item.costUsd.toFixed(2)} USD (x $${item.dolarRate})` : 'Costo ARS directo'}
+                                <td className="p-2.5">
+                                  <p className="font-bold text-gray-800">{item.itemTitle}</p>
+                                  <span className="text-[10px] text-gray-400 uppercase">{item.category}</span>
                                 </td>
+                                <td className="p-2.5 text-center font-semibold">{item.qty} un.</td>
                                 <td className="p-2.5 text-right font-bold text-[#768C77]">${unitCostArs.toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-                                <td className="p-2.5 text-right font-bold text-[#768C77]">${totalCostArs.toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                                <td className="p-2.5 text-right text-gray-600">${totalCostArs.toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
                                 <td className="p-2.5 text-right font-bold text-blue-700">${item.salePriceArs.toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-                                <td className="p-2.5 text-right font-bold text-blue-700">${totalSaleArs.toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                                <td className="p-2.5 text-right text-gray-600">${totalSaleArs.toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                                <td className="p-2.5 text-center">
+                                  <button 
+                                    onClick={() => handleSyncItemToStore(item)} 
+                                    className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg font-semibold text-[11px] shadow-xs transition flex items-center gap-1 mx-auto"
+                                    title="Envía este producto al inventario de la tienda o actualiza su stock y precio"
+                                  >
+                                    <i className="fa-solid fa-cloud-arrow-up"></i> Sincronizar
+                                  </button>
+                                </td>
                                 <td className="p-2.5 text-center">
                                   <button onClick={() => handleDeleteCostItem(item.id)} className="text-red-400 hover:text-red-600 p-1"><i className="fa-solid fa-trash-can"></i></button>
                                 </td>
@@ -666,16 +722,13 @@
                             <td className="p-3 text-center">{costSheet.reduce((acc, i) => acc + i.qty, 0)} un.</td>
                             <td></td>
                             <td className="p-3 text-right text-[#768C77]">
-                              {/* Promedio o total */}
-                            </td>
-                            <td className="p-3 text-right text-[#768C77]">
                               ${costSheet.reduce((acc, i) => acc + ((i.unitCostArs || 0) * i.qty), 0).toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
                             </td>
                             <td></td>
                             <td className="p-3 text-right text-blue-700">
                               ${costSheet.reduce((acc, i) => acc + (i.salePriceArs * i.qty), 0).toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
                             </td>
-                            <td></td>
+                            <td colSpan="2"></td>
                           </tr>
                         </tfoot>
                       </table>
@@ -860,180 +913,4 @@
                   <p className="text-gray-500 mt-1">Subí tu logo y ajustá la transparencia y el tamaño para que aparezca como marca de agua en la tienda.</p>
                 </div>
 
-                <form onSubmit={handleSaveDesign} className="space-y-4 max-w-xl">
-                  <div className="bg-gray-50 p-4 rounded-2xl border space-y-2">
-                    <label className="block font-semibold text-gray-700">🖼️ Logo para Fondo de Pantalla:</label>
-                    <input type="file" accept="image/*" onChange={e => handleFileSelection(e, 'bgLogo')} className="w-full text-xs" />
-                    <input type="text" placeholder="O pegá URL de tu logo..." value={storeConfig.bgLogoUrl || ''} onChange={e => setStoreConfig({...storeConfig, bgLogoUrl: e.target.value})} className="w-full p-2 border rounded-xl bg-white text-xs" />
-                    {storeConfig.bgLogoUrl && (
-                      <div className="mt-2 p-2 bg-white rounded-xl border flex items-center gap-3">
-                        <img src={storeConfig.bgLogoUrl} className="w-12 h-12 object-contain border rounded bg-gray-100" />
-                        <span className="text-[10px] text-gray-500">Vista previa del logo cargado.</span>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-gray-50 p-4 rounded-2xl border">
-                    <div>
-                      <label className="block font-semibold text-gray-700 mb-1">Transparencia: ({Math.round(storeConfig.bgOpacity * 100)}%)</label>
-                      <input type="range" min="0.02" max="0.5" step="0.01" value={storeConfig.bgOpacity} onChange={e => setStoreConfig({...storeConfig, bgOpacity: parseFloat(e.target.value)})} className="w-full accent-[#768C77]" />
-                    </div>
-                    <div>
-                      <label className="block font-semibold text-gray-700 mb-1">Tamaño del Logo: ({storeConfig.bgSize}%)</label>
-                      <input type="range" min="10" max="100" step="5" value={storeConfig.bgSize} onChange={e => setStoreConfig({...storeConfig, bgSize: parseInt(e.target.value)})} className="w-full accent-[#768C77]" />
-                    </div>
-                    <div>
-                      <label className="block font-semibold text-gray-700 mb-1">Modo de Fondo:</label>
-                      <select value={storeConfig.bgRepeat} onChange={e => setStoreConfig({...storeConfig, bgRepeat: e.target.value})} className="w-full p-2 border rounded-xl bg-white text-xs">
-                        <option value="no-repeat">Centrado Fijo (Marca de agua)</option>
-                        <option value="repeat">Mosaico (Patrón Repetido)</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block font-semibold text-gray-700 mb-1">Color de Marca:</label>
-                      <div className="flex items-center gap-2">
-                        <input type="color" value={storeConfig.brandColor} onChange={e => setStoreConfig({...storeConfig, brandColor: e.target.value})} className="w-10 h-10 rounded cursor-pointer border" />
-                        <span className="font-mono text-gray-600">{storeConfig.brandColor}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <button type="submit" className="bg-[#768C77] text-white px-6 py-2.5 rounded-xl font-medium shadow">Guardar Configuración Visual</button>
-                </form>
-              </div>
-            )}
-
-            {activeTab === 'security' && (
-              <div className="bg-white p-6 rounded-2xl border space-y-6 text-xs max-w-xl">
-                <div>
-                  <h3 className="font-serif-custom font-bold text-sm text-gray-800 flex items-center gap-2">
-                    <i className="fa-solid fa-key text-[#768C77]"></i> Configuración de Credenciales de Acceso
-                  </h3>
-                  <p className="text-gray-500 mt-1">Cambiá tu usuario, tu contraseña y configurá tus canales de recuperación.</p>
-                </div>
-
-                <form onSubmit={handleUpdateCredentials} className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block font-semibold text-gray-700 mb-1">Nuevo Usuario:</label>
-                      <input type="text" value={newAdminUser} onChange={e => setNewAdminUser(e.target.value)} className="w-full p-2 border rounded-xl bg-gray-50" required />
-                    </div>
-
-                    <div>
-                      <label className="block font-semibold text-gray-700 mb-1">Nueva Contraseña:</label>
-                      <input type="text" value={newAdminPass} onChange={e => setNewAdminPass(e.target.value)} className="w-full p-2 border rounded-xl bg-gray-50 font-mono" required />
-                    </div>
-                  </div>
-
-                  <div className="border-t pt-3 space-y-3">
-                    <p className="font-semibold text-gray-800">Canales para Recuperar Contraseña:</p>
-                    
-                    <div>
-                      <label className="block font-medium text-gray-700 mb-1">WhatsApp de Recuperación:</label>
-                      <input type="text" value={newAdminWsp} onChange={e => setNewAdminWsp(e.target.value)} className="w-full p-2 border rounded-xl bg-gray-50 num-style" placeholder="3512102238" required />
-                    </div>
-
-                    <div>
-                      <label className="block font-medium text-gray-700 mb-1">Email de Recuperación:</label>
-                      <input type="email" value={newAdminEmail} onChange={e => setNewAdminEmail(e.target.value)} className="w-full p-2 border rounded-xl bg-gray-50" placeholder="luisveron@ejemplo.com" required />
-                    </div>
-                  </div>
-
-                  <button type="submit" className="bg-[#768C77] text-white px-6 py-2.5 rounded-xl font-medium shadow">
-                    Guardar Cambios de Seguridad
-                  </button>
-                </form>
-              </div>
-            )}
-          </main>
-
-          {selectedReceipt && (
-            <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4 overflow-y-auto">
-              <div className="bg-white max-w-md w-full p-6 rounded-2xl shadow-2xl relative space-y-4" id="printable-receipt">
-                
-                <div className="text-center border-b pb-3">
-                  <h2 className="font-serif-custom text-xl font-bold tracking-widest text-gray-800">L&V HOGAR</h2>
-                  <p className="text-[10px] text-gray-500 uppercase">Comprobante de Venta no Válido como Factura Fiscal</p>
-                  <p className="text-[11px] text-gray-600 mt-1">Malvinas Argentinas, Córdoba</p>
-                  <p className="text-[11px] text-gray-600 num-style">WhatsApp: 3512102238</p>
-                </div>
-
-                <div className="text-xs space-y-1 bg-gray-50 p-3 rounded-xl border">
-                  <div className="flex justify-between font-mono font-bold">
-                    <span>Comprobante N°:</span>
-                    <span>{selectedReceipt.id}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Fecha:</span>
-                    <span className="num-style">{selectedReceipt.date}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Cliente:</span>
-                    <span>{selectedReceipt.clientName || 'Consumidor Final'}</span>
-                  </div>
-                  {selectedReceipt.clientAddress && (
-                    <div className="flex justify-between">
-                      <span>Dirección:</span>
-                      <span>{selectedReceipt.clientAddress}</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between">
-                    <span>Forma de Pago:</span>
-                    <span>{selectedReceipt.paymentMethod || 'Efectivo'}</span>
-                  </div>
-                </div>
-
-                <div className="space-y-2 text-xs">
-                  <p className="font-bold border-b pb-1">Detalle del Pedido:</p>
-                  {selectedReceipt.items && selectedReceipt.items.map((it, idx) => (
-                    <div key={idx} className="flex justify-between items-center text-[11px] border-b pb-1">
-                      <div>
-                        <p className="font-semibold">{it.title}</p>
-                        {it.selectedOptions && <p className="text-[9px] text-gray-400">[{it.selectedOptions}]</p>}
-                      </div>
-                      <div className="text-right font-mono num-style">
-                        <span>{it.qty} x ${Number(it.price).toLocaleString('es-AR')}</span>
-                        <p className="font-bold text-gray-800">${Number(it.price * it.qty).toLocaleString('es-AR')}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="border-t pt-2 space-y-1 text-xs num-style">
-                  {selectedReceipt.deliveryCost > 0 && (
-                    <div className="flex justify-between text-gray-500">
-                      <span>Costo de Envío:</span>
-                      <span>${Number(selectedReceipt.deliveryCost).toLocaleString('es-AR')}</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between text-sm font-bold text-[#768C77]">
-                    <span>Total Abonado:</span>
-                    <span>${Number(selectedReceipt.total).toLocaleString('es-AR')}</span>
-                  </div>
-                </div>
-
-                <div className="text-center pt-2 text-[10px] text-gray-400 border-t">
-                  <p>¡Muchas gracias por tu compra en L&V HOGAR!</p>
-                </div>
-
-                <div className="flex gap-2 pt-2 no-print">
-                  <button onClick={() => window.print()} className="w-1/2 bg-[#768C77] text-white py-2 rounded-xl text-xs font-medium">
-                    🖨️ Imprimir Ticket
-                  </button>
-                  <button onClick={() => setSelectedReceipt(null)} className="w-1/2 bg-gray-200 text-gray-700 py-2 rounded-xl text-xs font-medium">
-                    Cerrar
-                  </button>
-                </div>
-
-              </div>
-            </div>
-          )}
-
-        </div>
-      );
-    }
-
-    ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(AdminApp));
-  </script>
-</body>
-</html>
+                <form onSubmit={handleSaveDesign} className="space-
