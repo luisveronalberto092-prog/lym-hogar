@@ -81,7 +81,7 @@
         ];
       });
 
-      // Estado para la Planilla de Carga de Mercadería y Costos (Hoja de cálculo)
+      // Estado para la Planilla de Carga de Mercadería y Costos (con Costo ARS directo)
       const [costSheet, setCostSheet] = useState(() => {
         return JSON.parse(localStorage.getItem('lv_cost_sheet')) || [];
       });
@@ -92,6 +92,7 @@
         qty: '',
         costUsd: '',
         dolarRate: '',
+        costArsDirect: '',
         salePriceArs: ''
       });
 
@@ -256,21 +257,30 @@
         localStorage.setItem('lv_order_history', JSON.stringify(updated));
       };
 
-      // Guardar ítem en la Hoja de Cálculo de Costos
+      // Guardar ítem en la Hoja de Cálculo de Costos (con soporte ARS directo)
       const handleAddCostItem = e => {
         e.preventDefault();
-        if (!costForm.itemTitle || !costForm.qty || !costForm.costUsd || !costForm.dolarRate || !costForm.salePriceArs) {
-          alert('Por favor completá todos los campos de la planilla.');
+        if (!costForm.itemTitle || !costForm.qty || !costForm.salePriceArs) {
+          alert('Por favor completá los campos obligatorios (Artículo, Unidades y Precio de Venta).');
           return;
         }
+
+        const costUsd = parseFloat(costForm.costUsd) || 0;
+        const dolarRate = parseFloat(costForm.dolarRate) || 0;
+        const costArsDirect = parseFloat(costForm.costArsDirect) || 0;
+
+        // Si cargó costo en USD y Dólar, se calcula; si no, toma el costo ARS directo
+        const finalUnitCostArs = (costUsd > 0 && dolarRate > 0) ? (costUsd * dolarRate) : costArsDirect;
 
         const newItem = {
           id: Date.now(),
           date: costForm.date,
           itemTitle: costForm.itemTitle.trim(),
           qty: parseInt(costForm.qty),
-          costUsd: parseFloat(costForm.costUsd),
-          dolarRate: parseFloat(costForm.dolarRate),
+          costUsd: costUsd,
+          dolarRate: dolarRate,
+          costArsDirect: costArsDirect,
+          unitCostArs: finalUnitCostArs,
           salePriceArs: parseFloat(costForm.salePriceArs)
         };
 
@@ -284,6 +294,7 @@
           qty: '',
           costUsd: '',
           dolarRate: '',
+          costArsDirect: '',
           salePriceArs: ''
         });
         setMsg('¡Registro de mercadería agregado a la planilla!');
@@ -488,7 +499,7 @@
             <div className="flex gap-2 border-b pb-2 overflow-x-auto">
               <button onClick={() => setActiveTab('sales')} className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap ${activeTab === 'sales' ? 'bg-[#768C77] text-white' : 'bg-white border text-gray-700'}`}>📊 Ventas & Comprobantes</button>
               <button onClick={() => setActiveTab('inventory')} className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap ${activeTab === 'inventory' ? 'bg-[#768C77] text-white' : 'bg-white border text-gray-700'}`}>📦 Inventario Supabase</button>
-              <button onClick={() => setActiveTab('costsheet')} className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap ${activeTab === 'costsheet' ? 'bg-[#768C77] text-white' : 'bg-white border text-gray-700'}`}>📋 Planilla de Costos (Dólar)</button>
+              <button onClick={() => setActiveTab('costsheet')} className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap ${activeTab === 'costsheet' ? 'bg-[#768C77] text-white' : 'bg-white border text-gray-700'}`}>📋 Planilla de Costos & Precios</button>
               <button onClick={() => setActiveTab('categories')} className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap ${activeTab === 'categories' ? 'bg-[#768C77] text-white' : 'bg-white border text-gray-700'}`}>🏷️ Pestañas</button>
               <button onClick={() => setActiveTab('design')} className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap ${activeTab === 'design' ? 'bg-[#768C77] text-white' : 'bg-white border text-gray-700'}`}>🎨 Diseño & Logo Fondo</button>
               <button onClick={() => setActiveTab('security')} className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap ${activeTab === 'security' ? 'bg-[#768C77] text-white' : 'bg-white border text-gray-700'}`}>🔐 Seguridad & Claves</button>
@@ -555,16 +566,16 @@
               </div>
             )}
 
-            {/* NUEVA PLANILLA DE CARGA DE MERCADERÍA Y COSTOS (ESTILO HOJA DE CÁLCULO) */}
+            {/* PLANILLA DE CARGA DE MERCADERÍA Y COSTOS CON PESOS ARGENTINOS */}
             {activeTab === 'costsheet' && (
               <div className="space-y-6">
                 <div className="bg-white p-6 rounded-2xl border space-y-4 text-xs">
                   <div>
-                    <h3 className="font-serif-custom font-bold text-sm text-gray-800">📋 Carga de Mercadería a la Planilla de Costos</h3>
-                    <p className="text-gray-500 mt-1">Registrá tus compras especificando el costo en dólares, el valor del dólar y el precio de venta. Los totales se calculan automáticamente.</p>
+                    <h3 className="font-serif-custom font-bold text-sm text-gray-800">📋 Carga de Mercadería (Costos en USD, Dólar o Pesos ARS directos)</h3>
+                    <p className="text-gray-500 mt-1">Podés calcular el costo unitario mediante USD y Cotización del Dólar, o ingresar directamente el Costo en Pesos ($). Todo se calcula automáticamente.</p>
                   </div>
 
-                  <form onSubmit={handleAddCostItem} className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-6 gap-3 items-end">
+                  <form onSubmit={handleAddCostItem} className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-7 gap-3 items-end">
                     <div>
                       <label className="block font-semibold mb-1 text-gray-700">Fecha:</label>
                       <input type="date" value={costForm.date} onChange={e => setCostForm({...costForm, date: e.target.value})} className="w-full p-2 border rounded-xl bg-gray-50 num-style" required />
@@ -578,20 +589,23 @@
                       <input type="number" placeholder="Ej: 10" value={costForm.qty} onChange={e => setCostForm({...costForm, qty: e.target.value})} className="w-full p-2 border rounded-xl bg-gray-50 num-style" required />
                     </div>
                     <div>
-                      <label className="block font-semibold mb-1 text-gray-700">Costo Unit. (USD $):</label>
-                      <input type="number" step="0.01" placeholder="Ej: 15.00" value={costForm.costUsd} onChange={e => setCostForm({...costForm, costUsd: e.target.value})} className="w-full p-2 border rounded-xl bg-gray-50 num-style" required />
+                      <label className="block font-semibold mb-1 text-gray-700">Costo USD ($) o <span className="text-[#768C77]">Costo ARS ($ directo)</span>:</label>
+                      <div className="grid grid-cols-2 gap-1">
+                        <input type="number" step="0.01" placeholder="USD" value={costForm.costUsd} onChange={e => setCostForm({...costForm, costUsd: e.target.value})} className="w-full p-2 border rounded-xl bg-gray-50 num-style" />
+                        <input type="number" step="0.01" placeholder="ARS $" value={costForm.costArsDirect} onChange={e => setCostForm({...costForm, costArsDirect: e.target.value})} className="w-full p-2 border rounded-xl bg-gray-50 num-style font-bold text-[#768C77]" />
+                      </div>
                     </div>
                     <div>
                       <label className="block font-semibold mb-1 text-gray-700">Cotiz. Dólar ($):</label>
-                      <input type="number" step="0.01" placeholder="Ej: 1250" value={costForm.dolarRate} onChange={e => setCostForm({...costForm, dolarRate: e.target.value})} className="w-full p-2 border rounded-xl bg-gray-50 num-style" required />
+                      <input type="number" step="0.01" placeholder="Ej: 1250 (si usas USD)" value={costForm.dolarRate} onChange={e => setCostForm({...costForm, dolarRate: e.target.value})} className="w-full p-2 border rounded-xl bg-gray-50 num-style" />
                     </div>
                     <div>
                       <label className="block font-semibold mb-1 text-gray-700">Precio Venta Unit. ($):</label>
-                      <input type="number" step="0.01" placeholder="Ej: 25000" value={costForm.salePriceArs} onChange={e => setCostForm({...costForm, salePriceArs: e.target.value})} className="w-full p-2 border rounded-xl bg-gray-50 num-style" required />
+                      <input type="number" step="0.01" placeholder="Ej: 25000" value={costForm.salePriceArs} onChange={e => setCostForm({...costForm, salePriceArs: e.target.value})} className="w-full p-2 border rounded-xl bg-gray-50 num-style font-bold text-blue-700" required />
                     </div>
-                    <div className="sm:col-span-2 md:col-span-6 pt-2">
-                      <button type="submit" className="bg-[#768C77] text-white px-6 py-2.5 rounded-xl font-bold shadow hover:opacity-95 transition w-full">
-                        ➕ Agregar a la Planilla de Costos
+                    <div>
+                      <button type="submit" className="bg-[#768C77] text-white px-4 py-2.5 rounded-xl font-bold shadow hover:opacity-95 transition w-full">
+                        ➕ Agregar
                       </button>
                     </div>
                   </form>
@@ -599,7 +613,7 @@
 
                 <div className="bg-white p-6 rounded-2xl border space-y-4 text-xs">
                   <div className="flex justify-between items-center">
-                    <h3 className="font-serif-custom font-bold text-sm text-gray-800">📊 Planilla General de Ingresos y Costos</h3>
+                    <h3 className="font-serif-custom font-bold text-sm text-gray-800">📊 Planilla General de Ingresos, Costos y Precios en Pesos</h3>
                     <span className="text-gray-400">Total Registros: {costSheet.length}</span>
                   </div>
 
@@ -613,18 +627,17 @@
                             <th className="p-2.5">Fecha</th>
                             <th className="p-2.5">Artículo</th>
                             <th className="p-2.5 text-center">Unidades</th>
-                            <th className="p-2.5 text-right">Costo USD</th>
-                            <th className="p-2.5 text-right">Dólar ($)</th>
-                            <th className="p-2.5 text-right text-[#768C77]">Costo Unit. ($)</th>
-                            <th className="p-2.5 text-right text-[#768C77]">Costo Total ($)</th>
-                            <th className="p-2.5 text-right text-blue-700">Venta Unit. ($)</th>
-                            <th className="p-2.5 text-right text-blue-700">Venta Total ($)</th>
+                            <th className="p-2.5 text-right">Costo USD / Dólar</th>
+                            <th className="p-2.5 text-right text-[#768C77]">Costo Unit. ARS ($)</th>
+                            <th className="p-2.5 text-right text-[#768C77]">Costo Total ARS ($)</th>
+                            <th className="p-2.5 text-right text-blue-700">Venta Unit. ARS ($)</th>
+                            <th className="p-2.5 text-right text-blue-700">Venta Total ARS ($)</th>
                             <th className="p-2.5 text-center">Acción</th>
                           </tr>
                         </thead>
                         <tbody>
                           {costSheet.map(item => {
-                            const unitCostArs = item.costUsd * item.dolarRate;
+                            const unitCostArs = item.unitCostArs || 0;
                             const totalCostArs = unitCostArs * item.qty;
                             const totalSaleArs = item.salePriceArs * item.qty;
 
@@ -633,8 +646,9 @@
                                 <td className="p-2.5 text-gray-500">{item.date}</td>
                                 <td className="p-2.5 font-bold text-gray-800">{item.itemTitle}</td>
                                 <td className="p-2.5 text-center font-semibold">{item.qty}</td>
-                                <td className="p-2.5 text-right text-gray-600">${item.costUsd.toFixed(2)}</td>
-                                <td className="p-2.5 text-right text-gray-600">${item.dolarRate.toLocaleString('es-AR')}</td>
+                                <td className="p-2.5 text-right text-gray-600">
+                                  {item.costUsd > 0 ? `$${item.costUsd.toFixed(2)} USD (x $${item.dolarRate})` : 'Costo ARS directo'}
+                                </td>
                                 <td className="p-2.5 text-right font-bold text-[#768C77]">${unitCostArs.toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
                                 <td className="p-2.5 text-right font-bold text-[#768C77]">${totalCostArs.toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
                                 <td className="p-2.5 text-right font-bold text-blue-700">${item.salePriceArs.toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
@@ -650,9 +664,12 @@
                           <tr className="bg-gray-50 font-bold border-t-2 border-gray-200 num-style">
                             <td colSpan="2" className="p-3 text-right">TOTALES GENERALES PLANILLA:</td>
                             <td className="p-3 text-center">{costSheet.reduce((acc, i) => acc + i.qty, 0)} un.</td>
-                            <td colSpan="3"></td>
+                            <td></td>
                             <td className="p-3 text-right text-[#768C77]">
-                              ${costSheet.reduce((acc, i) => acc + (i.costUsd * i.dolarRate * i.qty), 0).toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                              {/* Promedio o total */}
+                            </td>
+                            <td className="p-3 text-right text-[#768C77]">
+                              ${costSheet.reduce((acc, i) => acc + ((i.unitCostArs || 0) * i.qty), 0).toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
                             </td>
                             <td></td>
                             <td className="p-3 text-right text-blue-700">
