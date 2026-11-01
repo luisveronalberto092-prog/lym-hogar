@@ -773,4 +773,78 @@
                     <span>Comprobante N°:</span>
                     <span>{selectedReceipt.id}</span>
                   </div>
-                  <div
+                  <div className="flex justify-between">
+                    <span>Fecha:</span>
+                    <span>{selectedReceipt.date}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Cliente:</span>
+                    <span>{selectedReceipt.clientName || 'Consumidor Final'}</span>
+                  </div>
+                  {selectedReceipt.clientAddress && (
+                    <div className="flex justify-between">
+                      <span>Dirección:</span>
+                      <span>{selectedReceipt.clientAddress}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between">
+                    <span>Forma de Pago:</span>
+                    <span>{selectedReceipt.paymentMethod || 'Efectivo'}</span>
+                  </div>
+                </div>
+
+                <div className="space-y-2 text-xs">
+                  <p className="font-bold border-b pb-1">Detalle del Pedido:</p>
+                  {selectedReceipt.items && selectedReceipt.items.map((it, idx) => (
+                    <div key={idx} className="flex justify-between items-center text-[11px] border-b pb-1">
+                      <div>
+                        <p className="font-semibold">{it.title}</p>
+                        {it.selectedOptions && <p className="text-[9px] text-gray-400">[{it.selectedOptions}]</p>}
+                      </div>
+                      <div className="text-right font-mono">
+                        <span>{it.qty} x ${Number(it.price).toLocaleString('es-AR')}</span>
+                        <p className="font-bold text-gray-800">${Number(it.price * it.qty).toLocaleString('es-AR')}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="border-t pt-2 space-y-1 text-xs">
+                  {selectedReceipt.deliveryCost > 0 && (
+                    <div className="flex justify-between text-gray-500">
+                      <span>Costo de Envío:</span>
+                      <span>${Number(selectedReceipt.deliveryCost).toLocaleString('es-AR')}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-sm font-bold text-[#768C77]">
+                    <span>Total Abonado:</span>
+                    <span>${Number(selectedReceipt.total).toLocaleString('es-AR')}</span>
+                  </div>
+                </div>
+
+                <div className="text-center pt-2 text-[10px] text-gray-400 border-t">
+                  <p>¡Muchas gracias por tu compra en L&V HOGAR!</p>
+                </div>
+
+                <div className="flex gap-2 pt-2 no-print">
+                  <button onClick={() => window.print()} className="w-1/2 bg-[#768C77] text-white py-2 rounded-xl text-xs font-medium">
+                    🖨️ Imprimir Ticket
+                  </button>
+                  <button onClick={() => setSelectedReceipt(null)} className="w-1/2 bg-gray-200 text-gray-700 py-2 rounded-xl text-xs font-medium">
+                    Cerrar
+                  </button>
+                </div>
+
+              </div>
+            </div>
+          )}
+
+        </div>
+      );
+    }
+
+    // CORREGIDO: Se agregó "document." para que cargue correctamente en el navegador
+    ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(AdminApp));
+  </script>
+</body>
+</html>
