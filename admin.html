@@ -30,6 +30,11 @@
       const [pass, setPass] = useState('');
       const [error, setError] = useState('');
       
+      // Estado para la recuperación de contraseña
+      const [isRecovering, setIsRecovering] = useState(false);
+      const [recoveryWord, setRecoveryWord] = useState('');
+      const [recoveryMsg, setRecoveryMsg] = useState('');
+
       const [activeTab, setActiveTab] = useState('inventory');
 
       const [products, setProducts] = useState([]);
@@ -49,7 +54,6 @@
         };
       });
 
-      // Formulario con casilleros separados para múltiples opciones
       const [form, setForm] = useState({
         title: '', 
         price: '', 
@@ -58,9 +62,9 @@
         image: '', 
         video: '', 
         description: '', 
-        variants: '',     // Talles / Opciones generales
-        colors: '',       // Casillero independiente para Colores
-        specifications: ''// Casillero independiente para Ficha técnica / Material
+        variants: '',     
+        colors: '',       
+        specifications: ''
       });
       const [additionalImages, setAdditionalImages] = useState([]);
 
@@ -114,7 +118,18 @@
         if (user === 'admin' && pass === 'admin123') {
           setIsAuth(true);
         } else {
-          setError('Usuario o clave incorrectos (admin / admin123)');
+          setError('Usuario o contraseña incorrectos (admin / admin123)');
+        }
+      };
+
+      const handleRecovery = e => {
+        e.preventDefault();
+        // Palabra clave secreta de recuperación para Luis
+        if (recoveryWord.trim().toLowerCase() === 'malvinas') {
+          setRecoveryMsg('✅ Contraseña restablecida con éxito. Tus datos de acceso son:\nUsuario: admin\nContraseña: admin123');
+          setRecoveryWord('');
+        } else {
+          setRecoveryMsg('❌ Palabra secreta incorrecta. Probá con "malvinas".');
         }
       };
 
@@ -202,20 +217,46 @@
         return (
           <div className="min-h-screen flex items-center justify-center p-4 bg-gray-100">
             <div className="bg-white p-8 rounded-2xl shadow-lg border w-full max-w-sm space-y-4">
-              <h2 className="text-xl font-serif text-center font-bold">Panel Administrador</h2>
-              {error && <p className="text-xs text-red-500 bg-red-50 p-2 rounded text-center">{error}</p>}
-              <form onSubmit={handleLogin} className="space-y-3">
-                <div>
-                  <label className="block text-xs font-semibold mb-1">Usuario</label>
-                  <input type="text" value={user} onChange={e => setUser(e.target.value)} className="w-full p-2.5 border rounded-xl text-xs bg-gray-50" required />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold mb-1">Contraseña</label>
-                  <input type="password" value={pass} onChange={e => setPass(e.target.value)} className="w-full p-2.5 border rounded-xl text-xs bg-gray-50" required />
-                </div>
-                <button type="submit" className="w-full bg-[#768C77] text-white py-2.5 rounded-xl text-xs font-medium">Ingresar</button>
-              </form>
-              <a href="index.html" className="block text-center text-xs text-gray-400 underline pt-2">Volver a la tienda</a>
+              <div className="text-center">
+                <h2 className="text-xl font-serif font-bold text-gray-800">L&V HOGAR</h2>
+                <p className="text-xs text-gray-500">Panel de Administración</p>
+              </div>
+
+              {!isRecovering ? (
+                <>
+                  {error && <p className="text-xs text-red-500 bg-red-50 p-2 rounded text-center">{error}</p>}
+                  <form onSubmit={handleLogin} className="space-y-3">
+                    <div>
+                      <label className="block text-xs font-semibold mb-1">Usuario</label>
+                      <input type="text" value={user} onChange={e => setUser(e.target.value)} className="w-full p-2.5 border rounded-xl text-xs bg-gray-50" required />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold mb-1">Contraseña</label>
+                      <input type="password" value={pass} onChange={e => setPass(e.target.value)} className="w-full p-2.5 border rounded-xl text-xs bg-gray-50" required />
+                    </div>
+                    <button type="submit" className="w-full bg-[#768C77] text-white py-2.5 rounded-xl text-xs font-medium shadow">Ingresar</button>
+                  </form>
+                  <div className="text-center pt-2 space-y-1">
+                    <button onClick={() => { setIsRecovering(true); setRecoveryMsg(''); }} className="text-xs text-[#768C77] underline hover:font-bold">¿Olvidaste tu contraseña?</button>
+                    <a href="index.html" className="block text-xs text-gray-400 underline">Volver a la tienda</a>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="text-center text-xs text-gray-600">
+                    <p>Ingresá la palabra clave secreta de seguridad para recordar tus datos de acceso.</p>
+                  </div>
+                  {recoveryMsg && <div className="text-xs p-2.5 rounded bg-gray-50 border text-center font-medium whitespace-pre-line">{recoveryMsg}</div>}
+                  <form onSubmit={handleRecovery} className="space-y-3">
+                    <div>
+                      <label className="block text-xs font-semibold mb-1">Palabra Secreta:</label>
+                      <input type="text" placeholder="Ej: malvinas" value={recoveryWord} onChange={e => setRecoveryWord(e.target.value)} className="w-full p-2.5 border rounded-xl text-xs bg-gray-50" required />
+                    </div>
+                    <button type="submit" className="w-full bg-[#768C77] text-white py-2.5 rounded-xl text-xs font-medium shadow">Verificar Palabra</button>
+                  </form>
+                  <button onClick={() => { setIsRecovering(false); setRecoveryMsg(''); }} className="w-full text-xs text-gray-500 underline text-center pt-2">Volver al Login</button>
+                </>
+              )}
             </div>
           </div>
         );
@@ -269,7 +310,7 @@
             {activeTab === 'inventory' ? (
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 
-                {/* Formulario con Casilleros Adicionales */}
+                {/* Formulario */}
                 <div className="bg-white p-5 rounded-2xl border space-y-3 text-xs">
                   <div className="flex justify-between items-center">
                     <h3 className="font-serif font-bold text-sm">{editingId ? '✏️ Editar Producto' : '📦 Cargar Producto'}</h3>
@@ -302,18 +343,18 @@
                       </div>
                       <div>
                         <label className="block font-medium mb-1">Talles / Medidas</label>
-                        <input type="text" placeholder="Ej: S, M, L o 30x40" value={form.variants} onChange={e => setForm({...form, variants: e.target.value})} className="w-full p-2 border rounded-xl bg-gray-50" />
+                        <input type="text" placeholder="Ej: S, M, L" value={form.variants} onChange={e => setForm({...form, variants: e.target.value})} className="w-full p-2 border rounded-xl bg-gray-50" />
                       </div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-2">
                       <div>
                         <label className="block font-medium mb-1">Colores / Modelos</label>
-                        <input type="text" placeholder="Ej: Rojo, Negro, Blanco" value={form.colors} onChange={e => setForm({...form, colors: e.target.value})} className="w-full p-2 border rounded-xl bg-gray-50" />
+                        <input type="text" placeholder="Ej: Rojo, Negro" value={form.colors} onChange={e => setForm({...form, colors: e.target.value})} className="w-full p-2 border rounded-xl bg-gray-50" />
                       </div>
                       <div>
-                        <label className="block font-medium mb-1">Especificaciones / Material</label>
-                        <input type="text" placeholder="Ej: Acero, 220V, BPA Free" value={form.specifications} onChange={e => setForm({...form, specifications: e.target.value})} className="w-full p-2 border rounded-xl bg-gray-50" />
+                        <label className="block font-medium mb-1">Especificaciones</label>
+                        <input type="text" placeholder="Ej: Acero, 220V" value={form.specifications} onChange={e => setForm({...form, specifications: e.target.value})} className="w-full p-2 border rounded-xl bg-gray-50" />
                       </div>
                     </div>
 
@@ -354,7 +395,7 @@
                   </form>
                 </div>
 
-                {/* Tabla de Inventario */}
+                {/* Tabla */}
                 <div className="bg-white p-5 rounded-2xl border space-y-3 text-xs md:col-span-2">
                   <h3 className="font-serif font-bold text-sm">Inventario en Supabase ({products.length})</h3>
                   {loading ? (
@@ -459,7 +500,7 @@
                           <p className="text-[#768C77] font-semibold mt-1">Estado: {ord.status}</p>
                           <div className="mt-2 space-y-1">
                             {ord.items.map((it, idx) => (
-                              <p key={idx} className="text-gray-600">• {it.title} {it.selectedVariant ? `[${it.selectedVariant}]` : ''} x{it.qty} (${Number(it.price * it.qty)})</p>
+                              <p key={idx} className="text-gray-600">• {it.title} {it.selectedOptions ? `[${it.selectedOptions}]` : ''} x{it.qty} (${Number(it.price * it.qty)})</p>
                             ))}
                           </div>
                         </div>
