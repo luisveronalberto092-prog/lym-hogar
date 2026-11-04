@@ -81,7 +81,6 @@
         ];
       });
 
-      // Estado para la Planilla de Carga de Mercadería y Costos
       const [costSheet, setCostSheet] = useState(() => {
         return JSON.parse(localStorage.getItem('lv_cost_sheet')) || [];
       });
@@ -258,7 +257,6 @@
         localStorage.setItem('lv_order_history', JSON.stringify(updated));
       };
 
-      // Guardar ítem en la Hoja de Cálculo de Costos
       const handleAddCostItem = e => {
         e.preventDefault();
         if (!costForm.itemTitle || !costForm.qty || !costForm.salePriceArs) {
@@ -309,14 +307,11 @@
         localStorage.setItem('lv_cost_sheet', JSON.stringify(updatedSheet));
       };
 
-      // NUEVO: Sincronizar un ítem de la planilla directamente con Supabase (Crea o actualiza stock y precio)
       const handleSyncToSupabase = async (item) => {
         try {
-          // Verificamos si ya existe un producto con ese título en Supabase
           const existing = products.find(p => p.title.toLowerCase() === item.itemTitle.toLowerCase());
 
           if (existing) {
-            // Si ya existe, actualizamos su precio y le sumamos el stock/unidades nuevas
             const newStock = Number(existing.stock || 0) + Number(item.qty);
             const { error } = await supabaseClient.from('productos').update({
               price: item.salePriceArs,
@@ -326,7 +321,6 @@
             if (error) throw error;
             setMsg(`¡"${item.itemTitle}" actualizado en la tienda! Precio: $${item.salePriceArs} | Stock sumado: +${item.qty}`);
           } else {
-            // Si no existe, lo creamos como nuevo producto en Supabase
             const payload = {
               title: item.itemTitle,
               price: item.salePriceArs,
@@ -608,13 +602,12 @@
               </div>
             )}
 
-            {/* PLANILLA DE COSTOS CONECTADA A SUPABASE (STOCK Y PRECIO) */}
             {activeTab === 'costsheet' && (
               <div className="space-y-6">
                 <div className="bg-white p-6 rounded-2xl border space-y-4 text-xs">
                   <div>
                     <h3 className="font-serif-custom font-bold text-sm text-gray-800">📋 Carga de Mercadería & Sincronización con Tienda</h3>
-                    <p className="text-gray-500 mt-1">Cargá tus costos, unidades y precio de venta. Luego podrás enviarlo directamente a la tienda para actualizar stock y precios de forma automática.</p>
+                    <p className="text-gray-500 mt-1">Cargá tus costos, unidades y precio de venta. Luego hacé clic en "Enviar a Tienda" para actualizar stock y precios de forma automática en tiempo real.</p>
                   </div>
 
                   <form onSubmit={handleAddCostItem} className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-8 gap-3 items-end">
