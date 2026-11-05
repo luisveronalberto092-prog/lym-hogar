@@ -82,7 +82,6 @@
         setLoading(false);
       };
 
-      // Carga inicial y Suscripción en Tiempo Real con Supabase
       useEffect(() => {
         fetchProducts();
         const channel = supabaseClient
@@ -147,27 +146,20 @@
         if (!clientName.trim()) { alert('Por favor ingresá tu Nombre y Apellido.'); return; }
         if (fulfillmentType === 'delivery' && !clientAddress.trim()) { alert('Por favor ingresá tu Dirección de entrega.'); return; }
 
-        let msg = `¡Hola L&V HOGAR! Quisiera realizar el siguiente pedido:\n\n👤 *Cliente:* ${clientName.trim()}\n`;
-        if (clientDni.trim()) msg += `🆔 *DNI:* ${clientDni.trim()}\n`;
+        let msg = `¡Hola L&V HOGAR! Quisiera realizar el siguiente pedido:\n\n👤 *Cliente:* ${clientName.trim()}\n`; if (clientDni.trim()) msg += `🆔 *DNI:* ${clientDni.trim()}\n`;
         
         msg += `\n🛒 *PRODUCTOS:*\n`;
         cart.forEach(item => {
-          const optText = item.selectedOptions ? ` [${item.selectedOptions}]` : '';
-          msg += `• ${item.title}${optText} x${item.qty} - $${(item.price * item.qty).toLocaleString('es-AR')}\n`;
-        });
-
-        msg += `\n💵 *Subtotal:* $${getSubtotal().toLocaleString('es-AR')}`;
+          const optText = item.selectedOptions ? ` [${item.selectedOptions}]` : ''; msg += `• ${item.title}${optText} x${item.qty} - $${(item.price * item.qty).toLocaleString('es-AR')}\n`; });  msg += `\n💵 *Subtotal:* $${getSubtotal().toLocaleString('es-AR')}`;
         if (fulfillmentType === 'delivery') {
           const zone = deliveryZones[selectedDeliveryZone];
-          msg += `\n🚚 *Envío:* ${zone.name} ($${zone.price.toLocaleString('es-AR')})`;
-          msg += `\n📍 *Dirección:* ${clientAddress.trim()}`;
+          msg += `\n🚚 *Envío:* ${zone.name} ($${zone.price.toLocaleString('es-AR')})`; msg += `\n📍 *Dirección:* ${clientAddress.trim()}`;
         } else {
           msg += `\n🏪 *Entrega:* Retiro en Local`;
         }
 
         msg += `\n⏰ *Horario:* ${preferredTime}`;
-        msg += `\n💳 *Pago:* ${paymentMethod}`;
-        msg += `\n\n💰 *TOTAL FINAL:* $${getTotal().toLocaleString('es-AR')}\n\n¿Me confirman la disponibilidad?`;
+        msg += `\n💳 *Pago:* ${paymentMethod}`; msg += `\n\n💰 *TOTAL FINAL:* $${getTotal().toLocaleString('es-AR')}\n\n¿Me confirman la disponibilidad?`;
 
         window.open(`https://wa.me/5493512102238?text=${encodeURIComponent(msg)}`, '_blank');
       };
@@ -191,10 +183,7 @@
             <div 
               className="fixed inset-0 pointer-events-none z-0"
               style={{
-                backgroundImage: `url(${storeConfig.bgLogoUrl})`,
-                backgroundPosition: 'center',
-                backgroundRepeat: storeConfig.bgRepeat || 'no-repeat',
-                backgroundSize: storeConfig.bgRepeat === 'repeat' ? '150px' : `${storeConfig.bgSize || 50}%`,
+                backgroundImage: `url(${storeConfig.bgLogoUrl})`, backgroundPosition: 'center', backgroundRepeat: storeConfig.bgRepeat \vert{}\vert{} 'no-repeat', backgroundSize: storeConfig.bgRepeat === 'repeat' ? '150px' : `${storeConfig.bgSize || 50}%`,
                 opacity: storeConfig.bgOpacity || 0.1
               }}
             />
@@ -227,7 +216,7 @@
                   placeholder="Buscar producto..." 
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
-                  className="w-48 sm:w-64 p-2.5 bg-white/90 backdrop-blur-xs border rounded-full text-xs shadow-xs focus:outline-none focus:ring-2 focus:ring-[#768C77]/30"
+                  className="w-48 sm:w-64 p-2.5 bg-white/95 backdrop-blur-xs border rounded-full text-xs shadow-xs focus:outline-none focus:ring-2 focus:ring-[#768C77]/30"
                 />
               </div>
 
@@ -246,10 +235,7 @@
                         isSelected ? 'text-white scale-105 font-bold' : 'text-gray-700 hover:border-gray-400 font-medium'
                       }`}
                     >
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-base transition ${
-                        isSelected ? 'bg-white/20 text-white' : 'bg-gray-100 text-[#768C77] group-hover:bg-[#768C77]/10'
-                      }`}>
-                        <i className={`fa-solid ${getCategoryIcon(cat)}`}></i>
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-base transition ${ isSelected ? 'bg-white/20 text-white' : 'bg-gray-100 text-[#768C77] group-hover:bg-[#768C77]/10' }`}> <i className={`fa-solid ${getCategoryIcon(cat)}`}></i>
                       </div>
                       <span className="text-xs text-center leading-tight">{cat}</span>
                     </button>
@@ -282,8 +268,7 @@
                           onClick={() => { setSelectedProduct(p); setActiveImageIndex(0); }}
                         >
                           <img src={p.image || 'https://images.unsplash.com/photo-1583847268964-b28dc8f51f92?auto=format&fit=crop&w=600&q=80'} className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
-                          <span className={`absolute top-3 right-3 text-[10px] font-bold px-2.5 py-1 rounded-full shadow backdrop-blur-md ${isAvailable ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
-                            {isAvailable ? `Stock: ${p.stock}` : 'Agotado'}
+                          <span className={`absolute top-3 right-3 text-[10px] font-bold px-2.5 py-1 rounded-full shadow backdrop-blur-md ${isAvailable ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200'}`}> {isAvailable ? `Stock: ${p.stock}` : 'Agotado'}
                           </span>
                         </div>
                         <div className="p-5 pb-3">
@@ -334,12 +319,6 @@
           {selectedProduct && (() => {
             const productImages = getProductImages(selectedProduct);
             const currentImg = productImages[activeImageIndex] || selectedProduct.image;
-            
-            const variants = selectedProduct.variants ? selectedProduct.variants.split(',').map(v => v.trim()) : [];
-            const colors = selectedProduct.colors ? selectedProduct.colors.split(',').map(c => c.trim()) : [];
-
-            const activeVar = chosenVariant[selectedProduct.id] || variants[0];
-            const activeCol = chosenColor[selectedProduct.id] || colors[0];
 
             return (
               <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 overflow-y-auto backdrop-blur-xs">
