@@ -81,6 +81,7 @@
         ];
       });
 
+      // Estado para la Planilla de Costos & Stock con soporte de Imagen
       const [costSheet, setCostSheet] = useState(() => {
         return JSON.parse(localStorage.getItem('lv_cost_sheet')) || [];
       });
@@ -93,7 +94,8 @@
         costUsd: '',
         dolarRate: '',
         costArsDirect: '',
-        salePriceArs: ''
+        salePriceArs: '',
+        image: ''
       });
 
       const [selectedReceipt, setSelectedReceipt] = useState(null);
@@ -151,6 +153,10 @@
         if (type === 'main') {
           const reader = new FileReader();
           reader.onload = evt => setForm(prev => ({ ...prev, image: evt.target.result }));
+          reader.readAsDataURL(files[0]);
+        } else if (type === 'costImage') {
+          const reader = new FileReader();
+          reader.onload = evt => setCostForm(prev => ({ ...prev, image: evt.target.result }));
           reader.readAsDataURL(files[0]);
         } else if (type === 'gallery') {
           files.forEach(file => {
@@ -279,7 +285,8 @@
           dolarRate: dolarRate,
           costArsDirect: costArsDirect,
           unitCostArs: finalUnitCostArs,
-          salePriceArs: parseFloat(costForm.salePriceArs)
+          salePriceArs: parseFloat(costForm.salePriceArs),
+          image: costForm.image || 'https://images.unsplash.com/photo-1583847268964-b28dc8f51f92?auto=format&fit=crop&w=600&q=80'
         };
 
         const updatedSheet = [newItem, ...costSheet];
@@ -294,7 +301,8 @@
           costUsd: '',
           dolarRate: '',
           costArsDirect: '',
-          salePriceArs: ''
+          salePriceArs: '',
+          image: ''
         });
         setMsg('¡Registro de mercadería agregado a la planilla!');
         setTimeout(() => setMsg(''), 3000);
@@ -313,11 +321,13 @@
 
           if (existing) {
             const newStock = Number(existing.stock || 0) + Number(item.qty);
-            const { error } = await supabaseClient.from('productos').update({
+            const updatePayload = {
               price: item.salePriceArs,
               stock: newStock
-            }).eq('id', existing.id);
+            };
+            if (item.image) updatePayload.image = item.image;
 
+            const { error } = await supabaseClient.from('productos').update(updatePayload).eq('id', existing.id);
             if (error) throw error;
             setMsg(`¡"${item.itemTitle}" actualizado en la tienda! Precio: $${item.salePriceArs} | Stock sumado: +${item.qty}`);
           } else {
@@ -326,7 +336,7 @@
               price: item.salePriceArs,
               stock: item.qty,
               category: item.category || categoriesList[0],
-              image: 'https://images.unsplash.com/photo-1583847268964-b28dc8f51f92?auto=format&fit=crop&w=600&q=80',
+              image: item.image || 'https://images.unsplash.com/photo-1583847268964-b28dc8f51f92?auto=format&fit=crop&w=600&q=80',
               description: 'Producto ingresado desde Planilla de Costos.',
               variants: '',
               colors: '',
@@ -602,21 +612,22 @@
               </div>
             )}
 
+            {/* PLANILLA DE COSTOS CON CARGA DE IMAGEN Y SINCRONIZACIÓN */}
             {activeTab === 'costsheet' && (
               <div className="space-y-6">
                 <div className="bg-white p-6 rounded-2xl border space-y-4 text-xs">
                   <div>
-                    <h3 className="font-serif-custom font-bold text-sm text-gray-800">📋 Carga de Mercadería & Sincronización con Tienda</h3>
-                    <p className="text-gray-500 mt-1">Cargá tus costos, unidades y precio de venta. Luego hacé clic en "Enviar a Tienda" para actualizar stock y precios de forma automática en tiempo real.</p>
+                    <h3 className="font-serif-custom font-bold text-sm text-gray-800">📋 Carga de Mercadería, Foto & Sincronización</h3>
+                    <p className="text-gray-500 mt-1">Cargá la foto, costos, unidades y precio de venta. Al hacer clic en "Enviar a Tienda", se subirá con su foto y stock integrado.</p>
                   </div>
 
-                  <form onSubmit={handleAddCostItem} className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-8 gap-3 items-end">
+                  <form onSubmit={handleAddCostItem} className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-9 gap-3 items-end">
                     <div>
                       <label className="block font-semibold mb-1 text-gray-700">Fecha:</label>
                       <input type="date" value={costForm.date} onChange={e => setCostForm({...costForm, date: e.target.value})} className="w-full p-2 border rounded-xl bg-gray-50 num-style" required />
                     </div>
                     <div>
-                      <label className="block font-semibold mb-1 text-gray-700">Artículo / Título:</label>
+                      <label className="block font-semibold mb-1 text-gray-700">Artículo:</label>
                       <input type="text" placeholder="Ej: Humidificador" value={costForm.itemTitle} onChange={e => setCostForm({...costForm, itemTitle: e.target.value})} className="w-full p-2 border rounded-xl bg-gray-50" required />
                     </div>
                     <div>
@@ -626,23 +637,27 @@
                       </select>
                     </div>
                     <div>
-                      <label className="block font-semibold mb-1 text-gray-700">Unidades (Stock):</label>
+                      <label className="block font-semibold mb-1 text-gray-700">Unidades:</label>
                       <input type="number" placeholder="Ej: 10" value={costForm.qty} onChange={e => setCostForm({...costForm, qty: e.target.value})} className="w-full p-2 border rounded-xl bg-gray-50 num-style" required />
                     </div>
                     <div>
-                      <label className="block font-semibold mb-1 text-gray-700">Costo USD o <span className="text-[#768C77]">ARS ($)</span>:</label>
+                      <label className="block font-semibold mb-1 text-gray-700">Costo USD o ARS:</label>
                       <div className="grid grid-cols-2 gap-1">
                         <input type="number" step="0.01" placeholder="USD" value={costForm.costUsd} onChange={e => setCostForm({...costForm, costUsd: e.target.value})} className="w-full p-2 border rounded-xl bg-gray-50 num-style" />
                         <input type="number" step="0.01" placeholder="ARS $" value={costForm.costArsDirect} onChange={e => setCostForm({...costForm, costArsDirect: e.target.value})} className="w-full p-2 border rounded-xl bg-gray-50 num-style font-bold text-[#768C77]" />
                       </div>
                     </div>
                     <div>
-                      <label className="block font-semibold mb-1 text-gray-700">Cotiz. Dólar ($):</label>
+                      <label className="block font-semibold mb-1 text-gray-700">Cotiz. Dólar:</label>
                       <input type="number" step="0.01" placeholder="Ej: 1250" value={costForm.dolarRate} onChange={e => setCostForm({...costForm, dolarRate: e.target.value})} className="w-full p-2 border rounded-xl bg-gray-50 num-style" />
                     </div>
                     <div>
-                      <label className="block font-semibold mb-1 text-gray-700">Precio Venta ($):</label>
+                      <label className="block font-semibold mb-1 text-gray-700">Precio Venta:</label>
                       <input type="number" step="0.01" placeholder="Ej: 25000" value={costForm.salePriceArs} onChange={e => setCostForm({...costForm, salePriceArs: e.target.value})} className="w-full p-2 border rounded-xl bg-gray-50 num-style font-bold text-blue-700" required />
+                    </div>
+                    <div>
+                      <label className="block font-semibold mb-1 text-gray-700">📸 Foto:</label>
+                      <input type="file" accept="image/*" onChange={e => handleFileSelection(e, 'costImage')} className="w-full text-[10px]" />
                     </div>
                     <div>
                       <button type="submit" className="bg-[#768C77] text-white px-3 py-2.5 rounded-xl font-bold shadow hover:opacity-95 transition w-full">
@@ -665,12 +680,13 @@
                       <table className="w-full text-left border-collapse">
                         <thead>
                           <tr className="border-b bg-gray-100 text-gray-700 font-bold">
+                            <th className="p-2.5">Foto</th>
                             <th className="p-2.5">Fecha</th>
                             <th className="p-2.5">Artículo</th>
                             <th className="p-2.5 text-center">Unidades</th>
-                            <th className="p-2.5 text-right text-[#768C77]">Costo Unit. ARS ($)</th>
-                            <th className="p-2.5 text-right text-blue-700">Venta Unit. ARS ($)</th>
-                            <th className="p-2.5 text-right text-blue-700">Venta Total ARS ($)</th>
+                            <th className="p-2.5 text-right text-[#768C77]">Costo Unit. ($)</th>
+                            <th className="p-2.5 text-right text-blue-700">Venta Unit. ($)</th>
+                            <th className="p-2.5 text-right text-blue-700">Venta Total ($)</th>
                             <th className="p-2.5 text-center">Sincronizar a Tienda</th>
                             <th className="p-2.5 text-center">Acción</th>
                           </tr>
@@ -682,6 +698,7 @@
 
                             return (
                               <tr key={item.id} className="border-b hover:bg-gray-50 num-style">
+                                <td className="p-2.5"><img src={item.image} className="w-9 h-9 object-cover rounded-xl border shadow-xs" /></td>
                                 <td className="p-2.5 text-gray-500">{item.date}</td>
                                 <td className="p-2.5 font-bold text-gray-800">{item.itemTitle} <span className="text-[10px] text-gray-400 block font-normal">({item.category})</span></td>
                                 <td className="p-2.5 text-center font-semibold">{item.qty} un.</td>
@@ -692,7 +709,6 @@
                                   <button 
                                     onClick={() => handleSyncToSupabase(item)} 
                                     className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-xl font-bold shadow-xs transition text-[11px]"
-                                    title="Envía este precio y suma stock a Supabase"
                                   >
                                     🔄 Enviar a Tienda
                                   </button>
