@@ -464,7 +464,7 @@
                     <button type="submit" className="w-full bg-[#768C77] text-white py-2.5 rounded-xl text-xs font-medium shadow">Ingresar</button>
                   </form>
                   <div className="text-center pt-2 space-y-1">
-                    <button onClick={() => { setIsRecovering(true); setRecoveryMsg(''); }} className="text-xs text-[#768C77] underline hover:font-bold">¿Olvidaste tu contraseña?</button>
+                    <button type="button" onClick={() => { setIsRecovering(true); setRecoveryMsg(''); }} className="text-xs text-[#768C77] underline hover:font-bold">¿Olvidaste tu contraseña?</button>
                     <a href="index.html" className="block text-xs text-gray-400 underline">Volver a la tienda</a>
                   </div>
                 </>
@@ -500,7 +500,7 @@
                       Enviar Datos de Ingreso
                     </button>
                   </form>
-                  <button onClick={() => { setIsRecovering(false); setRecoveryMsg(''); }} className="w-full text-xs text-gray-500 underline text-center pt-2">Volver al Login</button>
+                  <button type="button" onClick={() => { setIsRecovering(false); setRecoveryMsg(''); }} className="w-full text-xs text-gray-500 underline text-center pt-2">Volver al Login</button>
                 </>
               )}
             </div>
@@ -514,7 +514,7 @@
             <span className="font-serif-custom font-bold text-[#C8B297] tracking-wider">L&V HOGAR | Panel Admin</span>
             <div className="space-x-4">
               <a href="index.html" target="_blank" className="text-[#C8B297] underline">Ver Tienda</a>
-              <button onClick={() => setIsAuth(false)} className="text-red-400">Salir</button>
+              <button type="button" onClick={() => setIsAuth(false)} className="text-red-400">Salir</button>
             </div>
           </header>
 
@@ -548,12 +548,12 @@
             </div>
 
             <div className="flex gap-2 border-b pb-2 overflow-x-auto">
-              <button onClick={() => setActiveTab('costsheet')} className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap ${activeTab === 'costsheet' ? 'bg-[#768C77] text-white' : 'bg-white border text-gray-700'}`}>📋 Planilla de Costos & Stock</button>
-              <button onClick={() => setActiveTab('sales')} className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap ${activeTab === 'sales' ? 'bg-[#768C77] text-white' : 'bg-white border text-gray-700'}`}>📊 Ventas & Comprobantes</button>
-              <button onClick={() => setActiveTab('inventory')} className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap ${activeTab === 'inventory' ? 'bg-[#768C77] text-white' : 'bg-white border text-gray-700'}`}>📦 Inventario Supabase</button>
-              <button onClick={() => setActiveTab('categories')} className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap ${activeTab === 'categories' ? 'bg-[#768C77] text-white' : 'bg-white border text-gray-700'}`}>🏷️ Pestañas</button>
-              <button onClick={() => setActiveTab('design')} className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap ${activeTab === 'design' ? 'bg-[#768C77] text-white' : 'bg-white border text-gray-700'}`}>🎨 Diseño & Logo Fondo</button>
-              <button onClick={() => setActiveTab('security')} className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap ${activeTab === 'security' ? 'bg-[#768C77] text-white' : 'bg-white border text-gray-700'}`}>🔐 Seguridad & Claves</button>
+              <button type="button" onClick={() => setActiveTab('costsheet')} className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap ${activeTab === 'costsheet' ? 'bg-[#768C77] text-white' : 'bg-white border text-gray-700'}`}>📋 Planilla de Costos & Stock</button>
+              <button type="button" onClick={() => setActiveTab('sales')} className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap ${activeTab === 'sales' ? 'bg-[#768C77] text-white' : 'bg-white border text-gray-700'}`}>📊 Ventas & Comprobantes</button>
+              <button type="button" onClick={() => setActiveTab('inventory')} className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap ${activeTab === 'inventory' ? 'bg-[#768C77] text-white' : 'bg-white border text-gray-700'}`}>📦 Inventario Supabase</button>
+              <button type="button" onClick={() => setActiveTab('categories')} className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap ${activeTab === 'categories' ? 'bg-[#768C77] text-white' : 'bg-white border text-gray-700'}`}>🏷️ Pestañas</button>
+              <button type="button" onClick={() => setActiveTab('design')} className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap ${activeTab === 'design' ? 'bg-[#768C77] text-white' : 'bg-white border text-gray-700'}`}>🎨 Diseño & Logo Fondo</button>
+              <button type="button" onClick={() => setActiveTab('security')} className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap ${activeTab === 'security' ? 'bg-[#768C77] text-white' : 'bg-white border text-gray-700'}`}>🔐 Seguridad & Claves</button>
             </div>
 
             {activeTab === 'costsheet' && (
