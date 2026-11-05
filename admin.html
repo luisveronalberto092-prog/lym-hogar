@@ -59,7 +59,7 @@
       const [newAdminEmail, setNewAdminEmail] = useState(authConfig.email);
       const [newAdminWsp, setNewAdminWsp] = useState(authConfig.wsp);
 
-      const [activeTab, setActiveTab] = useState('sales');
+      const [activeTab, setActiveTab] = useState('costsheet');
 
       const [orderHistory, setOrderHistory] = useState(() => {
         return JSON.parse(localStorage.getItem('lv_order_history')) || [
@@ -81,7 +81,6 @@
         ];
       });
 
-      // Estado para la Planilla de Costos & Stock con soporte de Imagen
       const [costSheet, setCostSheet] = useState(() => {
         return JSON.parse(localStorage.getItem('lv_cost_sheet')) || [];
       });
@@ -265,6 +264,8 @@
 
       const handleAddCostItem = e => {
         e.preventDefault();
+        e.stopPropagation();
+
         if (!costForm.itemTitle || !costForm.qty || !costForm.salePriceArs) {
           alert('Por favor completá los campos obligatorios (Artículo, Unidades y Precio de Venta).');
           return;
@@ -296,7 +297,7 @@
         setCostForm({
           date: new Date().toISOString().split('T')[0],
           itemTitle: '',
-          category: '',
+          category: categoriesList[0],
           qty: '',
           costUsd: '',
           dolarRate: '',
@@ -315,7 +316,11 @@
         localStorage.setItem('lv_cost_sheet', JSON.stringify(updatedSheet));
       };
 
-      const handleSyncToSupabase = async (item) => {
+      const handleSyncToSupabase = async (e, item) => {
+        if (e) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
         try {
           const existing = products.find(p => p.title.toLowerCase() === item.itemTitle.toLowerCase());
 
@@ -344,7 +349,7 @@
             };
             const { error } = await supabaseClient.from('productos').insert([payload]);
             if (error) throw error;
-            setMsg(`¡"${item.itemTitle}" dado de alta exitosamente en la tienda con ${item.qty} un. y precio $${item.salePriceArs}!`);
+            setMsg(`¡"${item.itemTitle}" dado de alta exitosamente en la tienda con ${item.qty} un.!`);
           }
 
           fetchProducts();
@@ -543,76 +548,14 @@
             </div>
 
             <div className="flex gap-2 border-b pb-2 overflow-x-auto">
+              <button onClick={() => setActiveTab('costsheet')} className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap ${activeTab === 'costsheet' ? 'bg-[#768C77] text-white' : 'bg-white border text-gray-700'}`}>📋 Planilla de Costos & Stock</button>
               <button onClick={() => setActiveTab('sales')} className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap ${activeTab === 'sales' ? 'bg-[#768C77] text-white' : 'bg-white border text-gray-700'}`}>📊 Ventas & Comprobantes</button>
               <button onClick={() => setActiveTab('inventory')} className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap ${activeTab === 'inventory' ? 'bg-[#768C77] text-white' : 'bg-white border text-gray-700'}`}>📦 Inventario Supabase</button>
-              <button onClick={() => setActiveTab('costsheet')} className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap ${activeTab === 'costsheet' ? 'bg-[#768C77] text-white' : 'bg-white border text-gray-700'}`}>📋 Planilla de Costos & Stock</button>
               <button onClick={() => setActiveTab('categories')} className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap ${activeTab === 'categories' ? 'bg-[#768C77] text-white' : 'bg-white border text-gray-700'}`}>🏷️ Pestañas</button>
               <button onClick={() => setActiveTab('design')} className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap ${activeTab === 'design' ? 'bg-[#768C77] text-white' : 'bg-white border text-gray-700'}`}>🎨 Diseño & Logo Fondo</button>
               <button onClick={() => setActiveTab('security')} className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap ${activeTab === 'security' ? 'bg-[#768C77] text-white' : 'bg-white border text-gray-700'}`}>🔐 Seguridad & Claves</button>
             </div>
 
-            {activeTab === 'sales' && (
-              <div className="bg-white p-5 rounded-2xl border space-y-4 text-xs">
-                <div className="flex justify-between items-center">
-                  <h3 className="font-serif-custom font-bold text-sm text-gray-800">Historial de Ventas & Emisión de Comprobantes</h3>
-                  <span className="text-gray-400">Total: {orderHistory.length} registros</span>
-                </div>
-
-                {orderHistory.length === 0 ? (
-                  <p className="text-center py-10 text-gray-400">No hay ventas registradas todavía.</p>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left">
-                      <thead>
-                        <tr className="border-b bg-gray-50 text-gray-600">
-                          <th className="p-2">ID</th>
-                          <th className="p-2">Fecha</th>
-                          <th className="p-2">Cliente</th>
-                          <th className="p-2">Método Pago</th>
-                          <th className="p-2">Total</th>
-                          <th className="p-2">Estado</th>
-                          <th className="p-2 text-right">Comprobante / Acciones</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {orderHistory.map(ord => (
-                          <tr key={ord.id} className="border-b hover:bg-gray-50">
-                            <td className="p-2 font-mono font-bold text-[#768C77]">{ord.id}</td>
-                            <td className="p-2 text-gray-500 num-style">{ord.date}</td>
-                            <td className="p-2 font-medium">{ord.clientName || 'Cliente Web'}</td>
-                            <td className="p-2 text-gray-600">{ord.paymentMethod || 'Efectivo'}</td>
-                            <td className="p-2 font-bold text-gray-800 num-style">${Number(ord.total).toLocaleString('es-AR')}</td>
-                            <td className="p-2">
-                              <select 
-                                value={ord.status || 'Pendiente'} 
-                                onChange={e => handleUpdateOrderStatus(ord.id, e.target.value)}
-                                className="p-1 border rounded text-[11px] font-semibold bg-white"
-                              >
-                                <option value="Pendiente">⏳ Pendiente</option>
-                                <option value="Pagado">💳 Pagado</option>
-                                <option value="Entregado">✅ Entregado</option>
-                                <option value="Cancelado">❌ Cancelado</option>
-                              </select>
-                            </td>
-                            <td className="p-2 text-right space-x-2">
-                              <button 
-                                onClick={() => setSelectedReceipt(ord)} 
-                                className="bg-[#768C77] text-white px-2.5 py-1 rounded-lg font-medium text-[11px]"
-                              >
-                                📄 Comprobante
-                              </button>
-                              <button onClick={() => handleDeleteOrder(ord.id)} className="text-red-400" title="Eliminar"><i className="fa-solid fa-trash"></i></button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* PLANILLA DE COSTOS CON CARGA DE IMAGEN Y SINCRONIZACIÓN */}
             {activeTab === 'costsheet' && (
               <div className="space-y-6">
                 <div className="bg-white p-6 rounded-2xl border space-y-4 text-xs">
@@ -706,15 +649,12 @@
                                 <td className="p-2.5 text-right font-bold text-blue-700">${item.salePriceArs.toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
                                 <td className="p-2.5 text-right font-bold text-blue-700">${totalSaleArs.toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
                                 <td className="p-2.5 text-center">
-                                  <button 
-                                    onClick={() => handleSyncToSupabase(item)} 
-                                    className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-xl font-bold shadow-xs transition text-[11px]"
-                                  >
+                                  <button type="button" onClick={(e) => handleSyncToSupabase(e, item)} className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-xl font-bold shadow-xs transition text-[11px]">
                                     🔄 Enviar a Tienda
                                   </button>
                                 </td>
                                 <td className="p-2.5 text-center">
-                                  <button onClick={() => handleDeleteCostItem(item.id)} className="text-red-400 hover:text-red-600 p-1"><i className="fa-solid fa-trash-can"></i></button>
+                                  <button type="button" onClick={() => handleDeleteCostItem(item.id)} className="text-red-400 hover:text-red-600 p-1"><i className="fa-solid fa-trash-can"></i></button>
                                 </td>
                               </tr>
                             );
@@ -727,12 +667,70 @@
               </div>
             )}
 
+            {activeTab === 'sales' && (
+              <div className="bg-white p-5 rounded-2xl border space-y-4 text-xs">
+                <div className="flex justify-between items-center">
+                  <h3 className="font-serif-custom font-bold text-sm text-gray-800">Historial de Ventas & Emisión de Comprobantes</h3>
+                  <span className="text-gray-400">Total: {orderHistory.length} registros</span>
+                </div>
+
+                {orderHistory.length === 0 ? (
+                  <p className="text-center py-10 text-gray-400">No hay ventas registradas todavía.</p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left">
+                      <thead>
+                        <tr className="border-b bg-gray-50 text-gray-600">
+                          <th className="p-2">ID</th>
+                          <th className="p-2">Fecha</th>
+                          <th className="p-2">Cliente</th>
+                          <th className="p-2">Método Pago</th>
+                          <th className="p-2">Total</th>
+                          <th className="p-2">Estado</th>
+                          <th className="p-2 text-right">Comprobante / Acciones</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {orderHistory.map(ord => (
+                          <tr key={ord.id} className="border-b hover:bg-gray-50">
+                            <td className="p-2 font-mono font-bold text-[#768C77]">{ord.id}</td>
+                            <td className="p-2 text-gray-500 num-style">{ord.date}</td>
+                            <td className="p-2 font-medium">{ord.clientName || 'Cliente Web'}</td>
+                            <td className="p-2 text-gray-600">{ord.paymentMethod || 'Efectivo'}</td>
+                            <td className="p-2 font-bold text-gray-800 num-style">${Number(ord.total).toLocaleString('es-AR')}</td>
+                            <td className="p-2">
+                              <select 
+                                value={ord.status || 'Pendiente'} 
+                                onChange={e => handleUpdateOrderStatus(ord.id, e.target.value)}
+                                className="p-1 border rounded text-[11px] font-semibold bg-white"
+                              >
+                                <option value="Pendiente">⏳ Pendiente</option>
+                                <option value="Pagado">💳 Pagado</option>
+                                <option value="Entregado">✅ Entregado</option>
+                                <option value="Cancelado">❌ Cancelado</option>
+                              </select>
+                            </td>
+                            <td className="p-2 text-right space-x-2">
+                              <button type="button" onClick={() => setSelectedReceipt(ord)} className="bg-[#768C77] text-white px-2.5 py-1 rounded-lg font-medium text-[11px]">
+                                📄 Comprobante
+                              </button>
+                              <button type="button" onClick={() => handleDeleteOrder(ord.id)} className="text-red-400" title="Eliminar"><i className="fa-solid fa-trash"></i></button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
+
             {activeTab === 'inventory' && (
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="bg-white p-5 rounded-2xl border space-y-3 text-xs">
                   <div className="flex justify-between items-center">
                     <h3 className="font-serif-custom font-bold text-sm">{editingId ? '✏️ Editar Producto' : '📦 Cargar Producto'}</h3>
-                    {editingId && <button onClick={resetForm} className="text-gray-400 underline">Cancelar</button>}
+                    {editingId && <button type="button" onClick={resetForm} className="text-gray-400 underline">Cancelar</button>}
                   </div>
 
                   <form onSubmit={handleSave} className="space-y-3">
@@ -765,46 +763,10 @@
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="block font-medium mb-1">Colores / Modelos</label>
-                        <input type="text" placeholder="Ej: Rojo, Negro" value={form.colors} onChange={e => setForm({...form, colors: e.target.value})} className="w-full p-2 border rounded-xl bg-gray-50" />
-                      </div>
-                      <div>
-                        <label className="block font-medium mb-1">Especificaciones</label>
-                        <input type="text" placeholder="Ej: Acero, 220V" value={form.specifications} onChange={e => setForm({...form, specifications: e.target.value})} className="w-full p-2 border rounded-xl bg-gray-50" />
-                      </div>
-                    </div>
-
                     <div className="bg-gray-50 p-2 rounded-xl border space-y-1">
                       <label className="block font-medium text-gray-700">📸 Foto Principal:</label>
                       <input type="file" accept="image/*" onChange={e => handleFileSelection(e, 'main')} className="w-full text-[10px]" />
                       <input type="text" placeholder="O pegá URL..." value={form.image} onChange={e => setForm({...form, image: e.target.value})} className="w-full p-1.5 border rounded bg-white text-[11px]" />
-                    </div>
-
-                    <div className="bg-gray-50 p-2 rounded-xl border space-y-1">
-                      <label className="block font-medium text-gray-700">🖼️ Galería Secundaria:</label>
-                      <input type="file" accept="image/*" multiple onChange={e => handleFileSelection(e, 'gallery')} className="w-full text-[10px]" />
-                      {additionalImages.length > 0 && (
-                        <div className="flex gap-1 mt-1 overflow-x-auto">
-                          {additionalImages.map((img, idx) => (
-                            <div key={idx} className="relative">
-                              <img src={img} className="w-10 h-10 object-cover rounded border" />
-                              <button type="button" onClick={() => setAdditionalImages(additionalImages.filter((_, i) => i !== idx))} className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-3.5 h-3.5 text-[8px] flex items-center justify-center">×</button>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="bg-gray-50 p-2 rounded-xl border space-y-1">
-                      <label className="block font-medium text-gray-700">🎬 Video Demostrativo:</label>
-                      <input type="file" accept="video/*" onChange={e => handleFileSelection(e, 'video')} className="w-full text-[10px]" />
-                    </div>
-
-                    <div>
-                      <label className="block font-medium mb-1">Descripción</label>
-                      <textarea value={form.description} onChange={e => setForm({...form, description: e.target.value})} className="w-full p-2 border rounded-xl h-20 bg-gray-50"></textarea>
                     </div>
 
                     <button type="submit" className="w-full bg-[#768C77] text-white py-2.5 rounded-xl font-medium shadow">
@@ -841,8 +803,8 @@
                               <td className="p-2 font-bold text-[#768C77] num-style">${Number(p.price).toLocaleString('es-AR')}</td>
                               <td className="p-2"><span className={`px-2 py-0.5 rounded-full text-[10px] font-bold num-style ${Number(p.stock) > 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}`}>{p.stock} un.</span></td>
                               <td className="p-2 text-right space-x-2">
-                                <button onClick={() => handleEdit(p)} className="text-blue-500" title="Editar"><i className="fa-solid fa-pen"></i></button>
-                                <button onClick={() => handleDelete(p.id)} className="text-red-400" title="Eliminar"><i className="fa-solid fa-trash"></i></button>
+                                <button type="button" onClick={() => handleEdit(p)} className="text-blue-500" title="Editar"><i className="fa-solid fa-pen"></i></button>
+                                <button type="button" onClick={() => handleDelete(p.id)} className="text-red-400" title="Eliminar"><i className="fa-solid fa-trash"></i></button>
                               </td>
                             </tr>
                           ))}
@@ -883,7 +845,7 @@
                     {categoriesList.map((cat, idx) => (
                       <div key={idx} className="p-3 flex items-center justify-between bg-white">
                         <span className="font-semibold text-gray-800"><i className="fa-solid fa-tag text-[#768C77] mr-2"></i>{cat}</span>
-                        <button onClick={() => handleDeleteCategory(cat)} className="text-red-400 hover:text-red-600 p-1" title="Eliminar categoría">
+                        <button type="button" onClick={() => handleDeleteCategory(cat)} className="text-red-400 hover:text-red-600 p-1" title="Eliminar categoría">
                           <i className="fa-solid fa-trash-can"></i>
                         </button>
                       </div>
@@ -907,39 +869,7 @@
                     <label className="block font-semibold text-gray-700">🖼️ Logo para Fondo de Pantalla:</label>
                     <input type="file" accept="image/*" onChange={e => handleFileSelection(e, 'bgLogo')} className="w-full text-xs" />
                     <input type="text" placeholder="O pegá URL de tu logo..." value={storeConfig.bgLogoUrl || ''} onChange={e => setStoreConfig({...storeConfig, bgLogoUrl: e.target.value})} className="w-full p-2 border rounded-xl bg-white text-xs" />
-                    {storeConfig.bgLogoUrl && (
-                      <div className="mt-2 p-2 bg-white rounded-xl border flex items-center gap-3">
-                        <img src={storeConfig.bgLogoUrl} className="w-12 h-12 object-contain border rounded bg-gray-100" />
-                        <span className="text-[10px] text-gray-500">Vista previa del logo cargado.</span>
-                      </div>
-                    )}
                   </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-gray-50 p-4 rounded-2xl border">
-                    <div>
-                      <label className="block font-semibold text-gray-700 mb-1">Transparencia: ({Math.round(storeConfig.bgOpacity * 100)}%)</label>
-                      <input type="range" min="0.02" max="0.5" step="0.01" value={storeConfig.bgOpacity} onChange={e => setStoreConfig({...storeConfig, bgOpacity: parseFloat(e.target.value)})} className="w-full accent-[#768C77]" />
-                    </div>
-                    <div>
-                      <label className="block font-semibold text-gray-700 mb-1">Tamaño del Logo: ({storeConfig.bgSize}%)</label>
-                      <input type="range" min="10" max="100" step="5" value={storeConfig.bgSize} onChange={e => setStoreConfig({...storeConfig, bgSize: parseInt(e.target.value)})} className="w-full accent-[#768C77]" />
-                    </div>
-                    <div>
-                      <label className="block font-semibold text-gray-700 mb-1">Modo de Fondo:</label>
-                      <select value={storeConfig.bgRepeat} onChange={e => setStoreConfig({...storeConfig, bgRepeat: e.target.value})} className="w-full p-2 border rounded-xl bg-white text-xs">
-                        <option value="no-repeat">Centrado Fijo (Marca de agua)</option>
-                        <option value="repeat">Mosaico (Patrón Repetido)</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block font-semibold text-gray-700 mb-1">Color de Marca:</label>
-                      <div className="flex items-center gap-2">
-                        <input type="color" value={storeConfig.brandColor} onChange={e => setStoreConfig({...storeConfig, brandColor: e.target.value})} className="w-10 h-10 rounded cursor-pointer border" />
-                        <span className="font-mono text-gray-600">{storeConfig.brandColor}</span>
-                      </div>
-                    </div>
-                  </div>
-
                   <button type="submit" className="bg-[#768C77] text-white px-6 py-2.5 rounded-xl font-medium shadow">Guardar Configuración Visual</button>
                 </form>
               </div>
@@ -951,7 +881,6 @@
                   <h3 className="font-serif-custom font-bold text-sm text-gray-800 flex items-center gap-2">
                     <i className="fa-solid fa-key text-[#768C77]"></i> Configuración de Credenciales de Acceso
                   </h3>
-                  <p className="text-gray-500 mt-1">Cambiá tu usuario, tu contraseña y configurá tus canales de recuperación.</p>
                 </div>
 
                 <form onSubmit={handleUpdateCredentials} className="space-y-4">
@@ -960,30 +889,12 @@
                       <label className="block font-semibold text-gray-700 mb-1">Nuevo Usuario:</label>
                       <input type="text" value={newAdminUser} onChange={e => setNewAdminUser(e.target.value)} className="w-full p-2 border rounded-xl bg-gray-50" required />
                     </div>
-
                     <div>
                       <label className="block font-semibold text-gray-700 mb-1">Nueva Contraseña:</label>
                       <input type="text" value={newAdminPass} onChange={e => setNewAdminPass(e.target.value)} className="w-full p-2 border rounded-xl bg-gray-50 font-mono" required />
                     </div>
                   </div>
-
-                  <div className="border-t pt-3 space-y-3">
-                    <p className="font-semibold text-gray-800">Canales para Recuperar Contraseña:</p>
-                    
-                    <div>
-                      <label className="block font-medium text-gray-700 mb-1">WhatsApp de Recuperación:</label>
-                      <input type="text" value={newAdminWsp} onChange={e => setNewAdminWsp(e.target.value)} className="w-full p-2 border rounded-xl bg-gray-50 num-style" placeholder="3512102238" required />
-                    </div>
-
-                    <div>
-                      <label className="block font-medium text-gray-700 mb-1">Email de Recuperación:</label>
-                      <input type="email" value={newAdminEmail} onChange={e => setNewAdminEmail(e.target.value)} className="w-full p-2 border rounded-xl bg-gray-50" placeholder="luisveron@ejemplo.com" required />
-                    </div>
-                  </div>
-
-                  <button type="submit" className="bg-[#768C77] text-white px-6 py-2.5 rounded-xl font-medium shadow">
-                    Guardar Cambios de Seguridad
-                  </button>
+                  <button type="submit" className="bg-[#768C77] text-white px-6 py-2.5 rounded-xl font-medium shadow">Guardar Cambios de Seguridad</button>
                 </form>
               </div>
             )}
@@ -992,85 +903,22 @@
           {selectedReceipt && (
             <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4 overflow-y-auto">
               <div className="bg-white max-w-md w-full p-6 rounded-2xl shadow-2xl relative space-y-4" id="printable-receipt">
-                
                 <div className="text-center border-b pb-3">
                   <h2 className="font-serif-custom text-xl font-bold tracking-widest text-gray-800">L&V HOGAR</h2>
-                  <p className="text-[10px] text-gray-500 uppercase">Comprobante de Venta no Válido como Factura Fiscal</p>
-                  <p className="text-[11px] text-gray-600 mt-1">Malvinas Argentinas, Córdoba</p>
-                  <p className="text-[11px] text-gray-600 num-style">WhatsApp: 3512102238</p>
+                  <p className="text-[10px] text-gray-500 uppercase">Comprobante de Venta</p>
                 </div>
-
                 <div className="text-xs space-y-1 bg-gray-50 p-3 rounded-xl border">
-                  <div className="flex justify-between font-mono font-bold">
-                    <span>Comprobante N°:</span>
-                    <span>{selectedReceipt.id}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Fecha:</span>
-                    <span className="num-style">{selectedReceipt.date}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Cliente:</span>
-                    <span>{selectedReceipt.clientName || 'Consumidor Final'}</span>
-                  </div>
-                  {selectedReceipt.clientAddress && (
-                    <div className="flex justify-between">
-                      <span>Dirección:</span>
-                      <span>{selectedReceipt.clientAddress}</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between">
-                    <span>Forma de Pago:</span>
-                    <span>{selectedReceipt.paymentMethod || 'Efectivo'}</span>
-                  </div>
+                  <div className="flex justify-between font-mono font-bold"><span>Comprobante N°:</span><span>{selectedReceipt.id}</span></div>
+                  <div className="flex justify-between"><span>Fecha:</span><span className="num-style">{selectedReceipt.date}</span></div>
+                  <div className="flex justify-between"><span>Cliente:</span><span>{selectedReceipt.clientName}</span></div>
                 </div>
-
-                <div className="space-y-2 text-xs">
-                  <p className="font-bold border-b pb-1">Detalle del Pedido:</p>
-                  {selectedReceipt.items && selectedReceipt.items.map((it, idx) => (
-                    <div key={idx} className="flex justify-between items-center text-[11px] border-b pb-1">
-                      <div>
-                        <p className="font-semibold">{it.title}</p>
-                        {it.selectedOptions && <p className="text-[9px] text-gray-400">[{it.selectedOptions}]</p>}
-                      </div>
-                      <div className="text-right font-mono num-style">
-                        <span>{it.qty} x ${Number(it.price).toLocaleString('es-AR')}</span>
-                        <p className="font-bold text-gray-800">${Number(it.price * it.qty).toLocaleString('es-AR')}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="border-t pt-2 space-y-1 text-xs num-style">
-                  {selectedReceipt.deliveryCost > 0 && (
-                    <div className="flex justify-between text-gray-500">
-                      <span>Costo de Envío:</span>
-                      <span>${Number(selectedReceipt.deliveryCost).toLocaleString('es-AR')}</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between text-sm font-bold text-[#768C77]">
-                    <span>Total Abonado:</span>
-                    <span>${Number(selectedReceipt.total).toLocaleString('es-AR')}</span>
-                  </div>
-                </div>
-
-                <div className="text-center pt-2 text-[10px] text-gray-400 border-t">
-                  <p>¡Muchas gracias por tu compra en L&V HOGAR!</p>
-                </div>
-
                 <div className="flex gap-2 pt-2 no-print">
-                  <button onClick={() => window.print()} className="w-1/2 bg-[#768C77] text-white py-2 rounded-xl text-xs font-medium">
-                    🖨️ Imprimir Ticket
-                  </button>
-                  <button onClick={() => setSelectedReceipt(null)} className="w-1/2 bg-gray-200 text-gray-700 py-2 rounded-xl text-xs font-medium">
-                    Cerrar
-                  </button>
+                  <button type="button" onClick={() => window.print()} className="w-1/2 bg-[#768C77] text-white py-2 rounded-xl text-xs font-medium">🖨️ Imprimir</button>
+                  <button type="button" onClick={() => setSelectedReceipt(null)} className="w-1/2 bg-gray-200 text-gray-700 py-2 rounded-xl text-xs font-medium">Cerrar</button>
                 </div>
-
               </div>
             </div>
           )}
-
         </div>
       );
     }
