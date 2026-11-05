@@ -75,12 +75,14 @@
       const [paymentMethod, setPaymentMethod] = useState('Efectivo contra entrega');
 
       const fetchProducts = async () => {
-        const { data } = await supabaseClient.from('productos').select('*').order('id', { ascending: false });
-        setProducts(data || []);
+        const { data, error } = await supabaseClient.from('productos').select('*').order('id', { ascending: false });
+        if (!error && data) {
+          setProducts(data);
+        }
         setLoading(false);
       };
 
-      // Carga inicial y Suscripción en TIEMPO REAL (Actualiza la tienda al instante sin recargar)
+      // Carga inicial y Suscripción en Tiempo Real con Supabase
       useEffect(() => {
         fetchProducts();
         const channel = supabaseClient
@@ -166,21 +168,6 @@
         msg += `\n⏰ *Horario:* ${preferredTime}`;
         msg += `\n💳 *Pago:* ${paymentMethod}`;
         msg += `\n\n💰 *TOTAL FINAL:* $${getTotal().toLocaleString('es-AR')}\n\n¿Me confirman la disponibilidad?`;
-
-        window.open(`https://wa.me/5493512102238?text=${encodeURIComponent(msg)}`, '_blank');
-      };
-
-      const handleProductWhatsAppInquiry = (p) => {
-        const variants = p.variants ? p.variants.split(',').map(v => v.trim()) : [];
-        const colors = p.colors ? p.colors.split(',').map(c => c.trim()) : [];
-        const selVar = variants.length > 0 ? (chosenVariant[p.id] || variants[0]) : '';
-        const selCol = colors.length > 0 ? (chosenColor[p.id] || colors[0]) : '';
-        const optText = [selVar, selCol].filter(Boolean).join(' / ');
-
-        let msg = `¡Hola L&V HOGAR! Tengo una consulta sobre este producto:\n\n📦 *${p.title}*`;
-        if (optText) msg += `\n⚙️ *Opción:* ${optText}`;
-        msg += `\n💰 *Precio:* $${Number(p.price).toLocaleString('es-AR')}`;
-        msg += `\n\n¿Me podrían dar más detalles o confirmar disponibilidad?`;
 
         window.open(`https://wa.me/5493512102238?text=${encodeURIComponent(msg)}`, '_blank');
       };
@@ -296,16 +283,13 @@
                         >
                           <img src={p.image || 'https://images.unsplash.com/photo-1583847268964-b28dc8f51f92?auto=format&fit=crop&w=600&q=80'} className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
                           <span className={`absolute top-3 right-3 text-[10px] font-bold px-2.5 py-1 rounded-full shadow backdrop-blur-md ${isAvailable ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
-                            {isAvailable ? 'Disponible' : 'Agotado'}
+                            {isAvailable ? `Stock: ${p.stock}` : 'Agotado'}
                           </span>
                         </div>
                         <div className="p-5 pb-3">
                           <span style={{ color: storeConfig.brandColor || '#768C77' }} className="text-[10px] font-bold uppercase tracking-wider">{p.category}</span>
                           <h3 className="font-serif-custom text-base font-bold text-gray-800 mt-1 cursor-pointer hover:underline line-clamp-1" onClick={() => { setSelectedProduct(p); setActiveImageIndex(0); }}>{p.title}</h3>
                           <p className="text-gray-500 text-xs mt-1.5 line-clamp-2 leading-relaxed font-light">{p.description}</p>
-                          {p.specifications && (
-                            <p className="text-[11px] text-gray-400 mt-2 font-mono bg-gray-50 p-1.5 rounded-lg border">⚡ {p.specifications}</p>
-                          )}
                         </div>
                       </div>
 
@@ -371,14 +355,6 @@
                         <button onClick={(e) => { e.stopPropagation(); setActiveImageIndex(prev => (prev === productImages.length - 1 ? 0 : prev + 1)); }} className="absolute right-2 bg-black/60 text-white w-8 h-8 rounded-full flex items-center justify-center"><i className="fa-solid fa-chevron-right text-xs"></i></button>
                       )}
                     </div>
-
-                    {productImages.length > 1 && (
-                      <div className="flex gap-2 mt-3 overflow-x-auto w-full pb-1">
-                        {productImages.map((imgUrl, idx) => (
-                          <img key={idx} src={imgUrl} onClick={() => setActiveImageIndex(idx)} className={`w-12 h-12 object-cover rounded-xl cursor-pointer border-2 transition ${activeImageIndex === idx ? 'border-[#768C77]' : 'border-transparent opacity-60'}`} />
-                        ))}
-                      </div>
-                    )}
                   </div>
 
                   <div className="w-full md:w-1/2 p-6 md:p-8 flex flex-col justify-between bg-white">
@@ -391,41 +367,12 @@
                         <button onClick={() => setSelectedProduct(null)} className="text-gray-400 hover:text-black w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center"><i className="fa-solid fa-xmark"></i></button>
                       </div>
                       <p style={{ color: storeConfig.brandColor || '#768C77' }} className="text-2xl font-serif-custom font-bold mt-3 num-style">${Number(selectedProduct.price).toLocaleString('es-AR')}</p>
-
-                      {variants.length > 0 && (
-                        <div className="mt-4">
-                          <label className="block text-xs font-bold text-gray-700 mb-1">Talle / Medida:</label>
-                          <div className="flex flex-wrap gap-2">
-                            {variants.map((v, i) => (
-                              <button key={i} onClick={() => setChosenVariant({...chosenVariant, [selectedProduct.id]: v})} className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold border transition ${activeVar === v ? 'bg-[#768C77] text-white border-[#768C77]' : 'bg-gray-50 text-gray-700 border-gray-200'}`}>{v}</button>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {colors.length > 0 && (
-                        <div className="mt-4">
-                          <label className="block text-xs font-bold text-gray-700 mb-1">Color / Modelo:</label>
-                          <div className="flex flex-wrap gap-2">
-                            {colors.map((c, i) => (
-                              <button key={i} onClick={() => setChosenColor({...chosenColor, [selectedProduct.id]: c})} className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold border transition ${activeCol === c ? 'bg-[#768C77] text-white border-[#768C77]' : 'bg-gray-50 text-gray-700 border-gray-200'}`}>{c}</button>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
                       <p className="text-xs text-gray-600 mt-4 leading-relaxed font-light">{selectedProduct.description}</p>
-                      {selectedProduct.specifications && (
-                        <p className="text-xs text-gray-500 mt-3 bg-gray-50 p-2.5 rounded-xl border font-mono">⚡ <b>Especificaciones:</b> {selectedProduct.specifications}</p>
-                      )}
                     </div>
 
                     <div className="mt-8 pt-4 border-t border-gray-100 space-y-2">
                       <button onClick={() => { addToCart(selectedProduct); setSelectedProduct(null); }} style={{ backgroundColor: storeConfig.brandColor || '#768C77' }} className="w-full text-white py-3 rounded-xl text-xs font-bold shadow-md hover:opacity-95 transition">
                         Agregar al Carrito
-                      </button>
-                      <button onClick={() => handleProductWhatsAppInquiry(selectedProduct)} className="w-full bg-[#25D366] hover:bg-[#20ba5a] text-white py-2.5 rounded-xl text-xs font-semibold shadow-xs flex items-center justify-center gap-2 transition">
-                        <i className="fa-brands fa-whatsapp text-sm"></i> Consultar por este producto
                       </button>
                     </div>
                   </div>
@@ -436,18 +383,17 @@
 
           {fullScreenImage && (
             <div className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center p-4 cursor-zoom-out backdrop-blur-xs" onClick={() => setFullScreenImage(null)}>
-              <button onClick={() => setFullScreenImage(null)} className="absolute top-6 right-6 text-white bg-white/20 w-11 h-11 rounded-full flex items-center justify-center text-lg"><i className="fa-solid fa-xmark"></i></button>
               <img src={fullScreenImage} className="max-h-full max-w-full object-contain rounded-2xl shadow-2xl" />
             </div>
           )}
 
-          <a href="https://wa.me/5493512102238?text=¡Hola%20L&V%20HOGAR!%20Tengo%20una%20consulta%20general." target="_blank" rel="noopener noreferrer" className="fixed bottom-6 right-6 z-40 bg-[#25D366] text-white w-14 h-14 rounded-full flex items-center justify-center shadow-2xl hover:scale-110 transition" title="¡Consultanos por WhatsApp!">
+          <a href="https://wa.me/5493512102238?text=¡Hola%20L&V%20HOGAR!%20Tengo%20una%20consulta." target="_blank" rel="noopener noreferrer" className="fixed bottom-6 right-6 z-40 bg-[#25D366] text-white w-14 h-14 rounded-full flex items-center justify-center shadow-2xl hover:scale-110 transition">
             <i className="fa-brands fa-whatsapp text-3xl"></i>
           </a>
 
           {isCartOpen && (
             <div className="fixed inset-0 z-50 flex justify-end bg-black/50 backdrop-blur-xs">
-              <div className="bg-white w-full max-w-md h-full flex flex-col justify-between shadow-2xl p-6 overflow-y-auto animate-in slide-in-from-right duration-300">
+              <div className="bg-white w-full max-w-md h-full flex flex-col justify-between shadow-2xl p-6 overflow-y-auto">
                 <div>
                   <div className="flex justify-between items-center pb-4 border-b">
                     <h3 className="font-serif-custom text-lg font-bold text-gray-800">Tu Pedido</h3>
@@ -464,7 +410,6 @@
                             <img src={item.image} className="w-12 h-12 object-cover rounded-xl border shadow-xs" />
                             <div>
                               <p className="font-bold text-gray-800">{item.title}</p>
-                              {item.selectedOptions && <p className="text-[10px] text-[#768C77] font-semibold">{item.selectedOptions}</p>}
                               <p className="text-gray-500 num-style">${Number(item.price).toLocaleString('es-AR')} x {item.qty}</p>
                             </div>
                           </div>
@@ -481,58 +426,13 @@
                       <label className="block font-semibold mb-1 text-gray-700">Nombre y Apellido: <span className="text-red-500">*</span></label>
                       <input type="text" placeholder="Tu nombre..." value={clientName} onChange={e => setClientName(e.target.value)} className="w-full p-2.5 border rounded-xl bg-gray-50" />
                     </div>
-
                     <div>
-                      <label className="block font-semibold mb-1 text-gray-700">Entrega:</label>
-                      <div className="grid grid-cols-2 gap-2">
-                        <button type="button" onClick={() => setFulfillmentType('delivery')} className={`p-2.5 rounded-xl border text-[11px] transition ${fulfillmentType === 'delivery' ? 'bg-[#768C77] text-white font-bold border-[#768C77]' : 'bg-gray-50'}`}>🚚 Envío a Domicilio</button>
-                        <button type="button" onClick={() => setFulfillmentType('pickup')} className={`p-2.5 rounded-xl border text-[11px] transition ${fulfillmentType === 'pickup' ? 'bg-[#768C77] text-white font-bold border-[#768C77]' : 'bg-gray-50'}`}>🏪 Retiro en Local</button>
-                      </div>
-                    </div>
-
-                    {fulfillmentType === 'delivery' && (
-                      <>
-                        <div>
-                          <label className="block font-semibold mb-1 text-gray-700">Zona de Envío:</label>
-                          <select value={selectedDeliveryZone} onChange={e => setSelectedDeliveryZone(Number(e.target.value))} className="w-full p-2.5 border rounded-xl bg-gray-50">
-                            {deliveryZones.map((z, i) => <option key={i} value={i}>{z.name} - ${z.price}</option>)}
-                          </select>
-                        </div>
-                        <div>
-                          <label className="block font-semibold mb-1 text-gray-700">Dirección: <span className="text-red-500">*</span></label>
-                          <input type="text" placeholder="Calle, Número, Barrio..." value={clientAddress} onChange={e => setClientAddress(e.target.value)} className="w-full p-2.5 border rounded-xl bg-gray-50" />
-                        </div>
-                      </>
-                    )}
-
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="block font-semibold mb-1 text-gray-700">DNI (Opcional):</label>
-                        <input type="text" placeholder="Ej: 35123456" value={clientDni} onChange={e => setClientDni(e.target.value)} className="w-full p-2.5 border rounded-xl bg-gray-50 num-style" />
-                      </div>
-                      <div>
-                        <label className="block font-semibold mb-1 text-gray-700">Horario:</label>
-                        <select value={preferredTime} onChange={e => setPreferredTime(e.target.value)} className="w-full p-2.5 border rounded-xl bg-gray-50">
-                          <option value="Indistinto">Indistinto</option>
-                          <option value="Mañana (9hs a 13hs)">Mañana (9hs a 13hs)</option>
-                          <option value="Tarde (14hs a 18hs)">Tarde (14hs a 18hs)</option>
-                        </select>
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block font-semibold mb-1 text-gray-700">Medio de Pago:</label>
-                      <select value={paymentMethod} onChange={e => setPaymentMethod(e.target.value)} className="w-full p-2.5 border rounded-xl bg-gray-50">
-                        <option value="Efectivo contra entrega">Efectivo contra entrega</option>
-                        <option value="Transferencia (Alias: lvhogar.mp)">Transferencia (Alias: lvhogar.mp)</option>
-                        <option value="Mercado Pago">Mercado Pago</option>
-                      </select>
+                      <label className="block font-semibold mb-1 text-gray-700">Dirección: <span className="text-red-500">*</span></label>
+                      <input type="text" placeholder="Calle, Número, Barrio..." value={clientAddress} onChange={e => setClientAddress(e.target.value)} className="w-full p-2.5 border rounded-xl bg-gray-50" />
                     </div>
 
                     <div className="bg-gray-50 p-3 rounded-xl border space-y-1 num-style">
-                      <div className="flex justify-between text-gray-600"><span>Subtotal:</span><span>${getSubtotal().toLocaleString('es-AR')}</span></div>
-                      <div className="flex justify-between text-gray-600"><span>Envío:</span><span>${getDeliveryCost().toLocaleString('es-AR')}</span></div>
-                      <div className="flex justify-between font-bold text-sm border-t pt-1 text-[#768C77]"><span>Total:</span><span>${getTotal().toLocaleString('es-AR')}</span></div>
+                      <div className="flex justify-between font-bold text-sm text-[#768C77]"><span>Total:</span><span>${getTotal().toLocaleString('es-AR')}</span></div>
                     </div>
 
                     <button onClick={handleCheckoutWhatsApp} style={{ backgroundColor: storeConfig.brandColor || '#768C77' }} className="w-full text-white py-3 rounded-xl font-bold shadow flex items-center justify-center gap-2 hover:opacity-95 transition">
