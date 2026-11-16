@@ -85,10 +85,16 @@
         return JSON.parse(localStorage.getItem('lv_cost_sheet')) || [];
       });
 
+      const [categoriesList, setCategoriesList] = useState(() => {
+        return JSON.parse(localStorage.getItem('lv_store_categories')) || [
+          "Hogar", "Cuidado Personal", "Electrodomésticos", "Bazar y Cocina", "Aromas y Decoración", "Accesorios"
+        ];
+      });
+
       const [costForm, setCostForm] = useState({
         date: new Date().toISOString().split('T')[0],
         itemTitle: '',
-        category: '',
+        category: categoriesList[0] || 'Hogar',
         qty: '',
         costUsd: '',
         dolarRate: '',
@@ -100,12 +106,6 @@
       });
 
       const [selectedReceipt, setSelectedReceipt] = useState(null);
-
-      const [categoriesList, setCategoriesList] = useState(() => {
-        return JSON.parse(localStorage.getItem('lv_store_categories')) || [
-          "Hogar", "Cuidado Personal", "Electrodomésticos", "Bazar y Cocina", "Aromas y Decoración", "Accesorios"
-        ];
-      });
       const [newCategoryName, setNewCategoryName] = useState('');
 
       const [storeConfig, setStoreConfig] = useState(() => {
@@ -129,11 +129,68 @@
       });
       const [additionalImages, setAdditionalImages] = useState([]);
 
+      // Sincroniza automáticamente productos de Supabase hacia la Planilla si no existen o si cambiaron stock/precio
+      const syncSupabaseToCostSheet = (supabaseData) => {
+        if (!supabaseData || supabaseData.length === 0) return;
+        setCostSheet(prevSheet => {
+          let updatedSheet = [...prevSheet];
+          let changed = false;
+
+          supabaseData.forEach(prod => {
+            const idx = updatedSheet.findIndex(item => item.itemTitle.toLowerCase() === prod.title.toLowerCase());
+            if (idx === -1) {
+              // No está en la planilla -> lo agregamos automáticamente
+              updatedSheet.unshift({
+                id: prod.id || Date.now() + Math.random(),
+                date: new Date().toISOString().split('T')[0],
+                itemTitle: prod.title,
+                category: prod.category || categoriesList[0],
+                qty: Number(prod.stock) || 0,
+                costUsd: 0,
+                dolarRate: 0,
+                costArsDirect: 0,
+                unitCostArs: 0,
+                salePriceArs: Number(prod.price) || 0,
+                image: prod.image || 'https://images.unsplash.com/photo-1583847268964-b28dc8f51f92?auto=format&fit=crop&w=600&q=80',
+                gallery: Array.isArray(prod.gallery) ? prod.gallery : [],
+                video: prod.video || ''
+              });
+              changed = true;
+            } else {
+              // Ya está en la planilla -> reflejamos cambios de stock, precio o multimedia desde Supabase
+              if (
+                Number(updatedSheet[idx].qty) !== Number(prod.stock) ||
+                Number(updatedSheet[idx].salePriceArs) !== Number(prod.price) ||
+                updatedSheet[idx].category !== prod.category
+              ) {
+                updatedSheet[idx] = {
+                  ...updatedSheet[idx],
+                  qty: Number(prod.stock) || 0,
+                  salePriceArs: Number(prod.price) || 0,
+                  category: prod.category || updatedSheet[idx].category,
+                  image: prod.image || updatedSheet[idx].image,
+                  gallery: Array.isArray(prod.gallery) ? prod.gallery : updatedSheet[idx].gallery,
+                  video: prod.video || updatedSheet[idx].video
+                };
+                changed = true;
+              }
+            }
+          });
+
+          if (changed) {
+            localStorage.setItem('lv_cost_sheet', JSON.stringify(updatedSheet));
+          }
+          return updatedSheet;
+        });
+      };
+
       const fetchProducts = async () => {
         try {
           const { data, error } = await supabaseClient.from('productos').select('*').order('id', { ascending: false });
           if (error) throw error;
-          setProducts(data || []);
+          const list = data || [];
+          setProducts(list);
+          syncSupabaseToCostSheet(list);
         } catch (err) {
           console.error(err);
         } finally {
@@ -279,7 +336,45 @@
         localStorage.setItem('lv_order_history', JSON.stringify(updated));
       };
 
-      const handleAddCostItem = e => {
+      // Sincroniza un ítem hacia Supabase (usado automáticamente al agregar en planilla y con el botón manual)
+      const pushItemToSupabase = async (item, isAuto = false) => {
+        const existing = products.find(p => p.title.toLowerCase() === item.itemTitle.toLowerCase());
+
+        if (existing) {
+          const newStock = isAuto ? Number(item.qty) : (Number(existing.stock || 0) + Number(item.qty));
+          const updatePayload = {
+            price: item.salePriceArs,
+            stock: newStock,
+            category: item.category || existing.category
+          };
+          if (item.image) updatePayload.image = item.image;
+          if (item.gallery && item.gallery.length > 0) updatePayload.gallery = item.gallery;
+          if (item.video) updatePayload.video = item.video;
+
+          const { error } = await supabaseClient.from('productos').update(updatePayload).eq('id', existing.id);
+          if (error) throw error;
+          return { action: 'updated', newStock };
+        } else {
+          const payload = {
+            title: item.itemTitle,
+            price: item.salePriceArs,
+            stock: item.qty,
+            category: item.category || categoriesList[0],
+            image: item.image || 'https://images.unsplash.com/photo-1583847268964-b28dc8f51f92?auto=format&fit=crop&w=600&q=80',
+            gallery: item.gallery || [],
+            video: item.video || '',
+            description: 'Producto ingresado desde Planilla de Costos.',
+            variants: '',
+            colors: '',
+            specifications: ''
+          };
+          const { error } = await supabaseClient.from('productos').insert([payload]);
+          if (error) throw error;
+          return { action: 'created', newStock: item.qty };
+        }
+      };
+
+      const handleAddCostItem = async e => {
         e.preventDefault();
         e.stopPropagation();
 
@@ -309,9 +404,30 @@
           video: costForm.video || ''
         };
 
-        const updatedSheet = [newItem, ...costSheet];
+        // 1. Guardar en planilla local
+        const existingIdx = costSheet.findIndex(i => i.itemTitle.toLowerCase() === newItem.itemTitle.toLowerCase());
+        let updatedSheet;
+        if (existingIdx !== -1) {
+          updatedSheet = [...costSheet];
+          updatedSheet[existingIdx] = {
+            ...updatedSheet[existingIdx],
+            ...newItem,
+            qty: Number(updatedSheet[existingIdx].qty) + Number(newItem.qty)
+          };
+        } else {
+          updatedSheet = [newItem, ...costSheet];
+        }
         setCostSheet(updatedSheet);
         localStorage.setItem('lv_cost_sheet', JSON.stringify(updatedSheet));
+
+        // 2. Sincronizar automáticamente con Inventario Supabase
+        try {
+          await pushItemToSupabase(newItem, false);
+          await fetchProducts();
+          setMsg(`¡"${newItem.itemTitle}" agregado a la planilla y reflejado automáticamente en Inventario Supabase!`);
+        } catch (err) {
+          setMsg(`Guardado en planilla local (Aviso Supabase: ${err.message})`);
+        }
 
         setCostForm({
           date: new Date().toISOString().split('T')[0],
@@ -326,8 +442,7 @@
           gallery: [],
           video: ''
         });
-        setMsg('¡Registro de mercadería agregado a la planilla!');
-        setTimeout(() => setMsg(''), 3000);
+        setTimeout(() => setMsg(''), 4000);
       };
 
       const handleDeleteCostItem = (id) => {
@@ -343,41 +458,9 @@
           e.stopPropagation();
         }
         try {
-          const existing = products.find(p => p.title.toLowerCase() === item.itemTitle.toLowerCase());
-
-          if (existing) {
-            const newStock = Number(existing.stock || 0) + Number(item.qty);
-            const updatePayload = {
-              price: item.salePriceArs,
-              stock: newStock
-            };
-            if (item.image) updatePayload.image = item.image;
-            if (item.gallery && item.gallery.length > 0) updatePayload.gallery = item.gallery;
-            if (item.video) updatePayload.video = item.video;
-
-            const { error } = await supabaseClient.from('productos').update(updatePayload).eq('id', existing.id);
-            if (error) throw error;
-            setMsg(`¡"${item.itemTitle}" actualizado en la tienda! Precio: $${item.salePriceArs} | Stock sumado: +${item.qty}`);
-          } else {
-            const payload = {
-              title: item.itemTitle,
-              price: item.salePriceArs,
-              stock: item.qty,
-              category: item.category || categoriesList[0],
-              image: item.image || 'https://images.unsplash.com/photo-1583847268964-b28dc8f51f92?auto=format&fit=crop&w=600&q=80',
-              gallery: item.gallery || [],
-              video: item.video || '',
-              description: 'Producto ingresado desde Planilla de Costos.',
-              variants: '',
-              colors: '',
-              specifications: ''
-            };
-            const { error } = await supabaseClient.from('productos').insert([payload]);
-            if (error) throw error;
-            setMsg(`¡"${item.itemTitle}" dado de alta exitosamente en la tienda con ${item.qty} un.!`);
-          }
-
-          fetchProducts();
+          const res = await pushItemToSupabase(item, true);
+          await fetchProducts();
+          setMsg(`¡"${item.itemTitle}" sincronizado con Supabase! Stock actual: ${res.newStock} un.`);
           setTimeout(() => setMsg(''), 4000);
         } catch (err) {
           alert('Error al sincronizar con Supabase: ' + err.message);
@@ -387,13 +470,19 @@
       const handleSave = async e => {
         e.preventDefault();
         try {
+          const cleanTitle = form.title.trim();
+          const parsedPrice = parseFloat(form.price);
+          const parsedStock = parseInt(form.stock) || 10;
+          const finalImage = form.image || 'https://images.unsplash.com/photo-1583847268964-b28dc8f51f92?auto=format&fit=crop&w=600&q=80';
+          const finalVideo = form.video ? form.video.trim() : '';
+
           const payload = {
-            title: form.title.trim(),
-            price: parseFloat(form.price),
-            stock: parseInt(form.stock) || 10,
+            title: cleanTitle,
+            price: parsedPrice,
+            stock: parsedStock,
             category: form.category,
-            image: form.image || 'https://images.unsplash.com/photo-1583847268964-b28dc8f51f92?auto=format&fit=crop&w=600&q=80',
-            video: form.video ? form.video.trim() : '',
+            image: finalImage,
+            video: finalVideo,
             gallery: additionalImages,
             description: form.description ? form.description.trim() : '',
             variants: form.variants ? form.variants.trim() : '',
@@ -404,16 +493,51 @@
           if (editingId) {
             const { error } = await supabaseClient.from('productos').update(payload).eq('id', editingId);
             if (error) throw error;
-            setMsg('¡Producto actualizado con éxito en Supabase!');
           } else {
             const { error } = await supabaseClient.from('productos').insert([payload]);
             if (error) throw error;
-            setMsg('¡Producto guardado con éxito en Supabase!');
           }
 
+          // Reflejar inmediatamente en la Planilla de Costos & Stock
+          setCostSheet(prevSheet => {
+            const idx = prevSheet.findIndex(item => item.itemTitle.toLowerCase() === cleanTitle.toLowerCase());
+            let updatedSheet = [...prevSheet];
+            if (idx !== -1) {
+              updatedSheet[idx] = {
+                ...updatedSheet[idx],
+                itemTitle: cleanTitle,
+                category: form.category,
+                qty: parsedStock,
+                salePriceArs: parsedPrice,
+                image: finalImage,
+                gallery: additionalImages,
+                video: finalVideo
+              };
+            } else {
+              updatedSheet.unshift({
+                id: Date.now(),
+                date: new Date().toISOString().split('T')[0],
+                itemTitle: cleanTitle,
+                category: form.category,
+                qty: parsedStock,
+                costUsd: 0,
+                dolarRate: 0,
+                costArsDirect: 0,
+                unitCostArs: 0,
+                salePriceArs: parsedPrice,
+                image: finalImage,
+                gallery: additionalImages,
+                video: finalVideo
+              });
+            }
+            localStorage.setItem('lv_cost_sheet', JSON.stringify(updatedSheet));
+            return updatedSheet;
+          });
+
+          setMsg(editingId ? '¡Producto actualizado en Supabase y reflejado en Planilla!' : '¡Producto guardado en Supabase y reflejado en Planilla!');
           resetForm();
           fetchProducts();
-          setTimeout(() => setMsg(''), 3000);
+          setTimeout(() => setMsg(''), 3500);
         } catch (err) {
           alert('Error al guardar: ' + err.message);
         }
@@ -441,8 +565,17 @@
       const handleDelete = async id => {
         if (!confirm('¿Seguro que querés eliminar este producto?')) return;
         try {
+          const targetProd = products.find(p => p.id === id);
           const { error } = await supabaseClient.from('productos').delete().eq('id', id);
           if (error) throw error;
+
+          if (targetProd) {
+            setCostSheet(prevSheet => {
+              const updated = prevSheet.filter(item => item.itemTitle.toLowerCase() !== targetProd.title.toLowerCase());
+              localStorage.setItem('lv_cost_sheet', JSON.stringify(updated));
+              return updated;
+            });
+          }
           fetchProducts();
         } catch (err) {
           alert('Error al eliminar: ' + err.message);
@@ -586,7 +719,7 @@
                 <div className="bg-white p-6 rounded-2xl border space-y-4 text-xs">
                   <div>
                     <h3 className="font-serif-custom font-bold text-sm text-gray-800">📋 Carga de Mercadería, Múltiples Fotos, Video & Sincronización</h3>
-                    <p className="text-gray-500 mt-1">Podés seleccionar varias fotos juntas (manteniendo Ctrl o Shift) y un video desde la misma fila.</p>
+                    <p className="text-gray-500 mt-1">Todo lo que cargues aquí se sincroniza automáticamente con Inventario Supabase y viceversa.</p>
                   </div>
 
                   <form onSubmit={handleAddCostItem} className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-10 gap-3 items-end">
@@ -665,7 +798,7 @@
                             <th className="p-2.5 text-right text-[#768C77]">Costo Unit. ($)</th>
                             <th className="p-2.5 text-right text-blue-700">Venta Unit. ($)</th>
                             <th className="p-2.5 text-right text-blue-700">Venta Total ($)</th>
-                            <th className="p-2.5 text-center">Sincronizar a Tienda</th>
+                            <th className="p-2.5 text-center">Estado Sync</th>
                             <th className="p-2.5 text-center">Acción</th>
                           </tr>
                         </thead>
@@ -674,6 +807,7 @@
                             const unitCostArs = item.unitCostArs || 0;
                             const totalSaleArs = item.salePriceArs * item.qty;
                             const extraPhotos = item.gallery?.length || 0;
+                            const inSupabase = products.some(p => p.title.toLowerCase() === item.itemTitle.toLowerCase());
 
                             return (
                               <tr key={item.id} className="border-b hover:bg-gray-50 num-style">
@@ -693,8 +827,8 @@
                                 <td className="p-2.5 text-right font-bold text-blue-700">${item.salePriceArs.toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
                                 <td className="p-2.5 text-right font-bold text-blue-700">${totalSaleArs.toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
                                 <td className="p-2.5 text-center">
-                                  <button type="button" onClick={(e) => handleSyncToSupabase(e, item)} className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-xl font-bold shadow-xs transition text-[11px]">
-                                    🔄 Enviar a Tienda
+                                  <button type="button" onClick={(e) => handleSyncToSupabase(e, item)} className={`px-3 py-1.5 rounded-xl font-bold shadow-xs transition text-[11px] text-white ${inSupabase ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-amber-500 hover:bg-amber-600'}`}>
+                                    {inSupabase ? '✅ Sincronizado' : '🔄 Enviar a Tienda'}
                                   </button>
                                 </td>
                                 <td className="p-2.5 text-center">
