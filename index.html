@@ -48,7 +48,7 @@
       const [searchQuery, setSearchQuery] = useState('');
       
       const [selectedProduct, setSelectedProduct] = useState(null);
-      const [activeImageIndex, setActiveImageIndex] = useState(0);
+      const [activeMediaIndex, setActiveMediaIndex] = useState(0);
       const [fullScreenImage, setFullScreenImage] = useState(null);
       
       const [quantities, setQuantities] = useState({});
@@ -171,11 +171,21 @@
         window.open(`https://wa.me/5493512102238?text=${encodeURIComponent(msg)}`, '_blank');
       };
 
-      const getProductImages = (p) => {
+      const getProductMedia = (p) => {
         if (!p) return [];
-        const main = p.image || 'https://images.unsplash.com/photo-1583847268964-b28dc8f51f92?auto=format&fit=crop&w=600&q=80';
-        const gal = (p.gallery && Array.isArray(p.gallery)) ? p.gallery : [];
-        return [main, ...gal];
+        const media = [];
+        const mainImg = p.image || 'https://images.unsplash.com/photo-1583847268964-b28dc8f51f92?auto=format&fit=crop&w=600&q=80';
+        media.push({ type: 'image', url: mainImg });
+
+        if (p.gallery && Array.isArray(p.gallery)) {
+          p.gallery.forEach(imgUrl => {
+            if (imgUrl) media.push({ type: 'image', url: imgUrl });
+          });
+        }
+        if (p.video && p.video.trim()) {
+          media.push({ type: 'video', url: p.video.trim() });
+        }
+        return media;
       };
 
       const filtered = products.filter(p => {
@@ -266,6 +276,8 @@
                 {filtered.map(p => {
                   const isAvailable = Number(p.stock) > 0;
                   const currentQty = quantities[p.id] || 1;
+                  const extraPhotosCount = Array.isArray(p.gallery) ? p.gallery.length : 0;
+                  const hasVideo = Boolean(p.video && p.video.trim());
                   
                   const variants = p.variants ? p.variants.split(',').map(v => v.trim()) : [];
                   const colors = p.colors ? p.colors.split(',').map(c => c.trim()) : [];
@@ -278,16 +290,30 @@
                       <div>
                         <div 
                           className="h-52 bg-gray-100 relative cursor-pointer group overflow-hidden"
-                          onClick={() => { setSelectedProduct(p); setActiveImageIndex(0); }}
+                          onClick={() => { setSelectedProduct(p); setActiveMediaIndex(0); }}
                         >
                           <img src={p.image || 'https://images.unsplash.com/photo-1583847268964-b28dc8f51f92?auto=format&fit=crop&w=600&q=80'} className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
                           <span className={`absolute top-3 right-3 text-[10px] font-bold px-2.5 py-1 rounded-full shadow backdrop-blur-md ${isAvailable ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
                             {isAvailable ? `Stock: ${p.stock}` : 'Agotado'}
                           </span>
+                          {(extraPhotosCount > 0 || hasVideo) && (
+                            <div className="absolute bottom-2 left-2 flex gap-1.5">
+                              {extraPhotosCount > 0 && (
+                                <span className="bg-black/70 text-white text-[10px] px-2 py-0.5 rounded-full backdrop-blur-xs">
+                                  <i className="fa-solid fa-images mr-1"></i>+{extraPhotosCount}
+                                </span>
+                              )}
+                              {hasVideo && (
+                                <span className="bg-red-600/90 text-white text-[10px] px-2 py-0.5 rounded-full backdrop-blur-xs">
+                                  <i className="fa-solid fa-play mr-1"></i>Video
+                                </span>
+                              )}
+                            </div>
+                          )}
                         </div>
                         <div className="p-5 pb-3">
                           <span style={{ color: storeConfig.brandColor || '#768C77' }} className="text-[10px] font-bold uppercase tracking-wider">{p.category}</span>
-                          <h3 className="font-serif-custom text-base font-bold text-gray-800 mt-1 cursor-pointer hover:underline line-clamp-1" onClick={() => { setSelectedProduct(p); setActiveImageIndex(0); }}>{p.title}</h3>
+                          <h3 className="font-serif-custom text-base font-bold text-gray-800 mt-1 cursor-pointer hover:underline line-clamp-1" onClick={() => { setSelectedProduct(p); setActiveMediaIndex(0); }}>{p.title}</h3>
                           <p className="text-gray-500 text-xs mt-1.5 line-clamp-2 leading-relaxed font-light">{p.description}</p>
                         </div>
                       </div>
@@ -295,7 +321,7 @@
                       <div className="p-5 pt-0 space-y-3">
                         <div className="flex justify-between items-center pt-2 border-t border-gray-50">
                           <span style={{ color: storeConfig.brandColor || '#768C77' }} className="text-lg font-serif-custom font-bold num-style">${Number(p.price).toLocaleString('es-AR')}</span>
-                          <button onClick={() => { setSelectedProduct(p); setActiveImageIndex(0); }} className="text-xs text-gray-400 hover:text-gray-700 underline font-medium">Ver detalle</button>
+                          <button onClick={() => { setSelectedProduct(p); setActiveMediaIndex(0); }} className="text-xs text-gray-400 hover:text-gray-700 underline font-medium">Ver detalle</button>
                         </div>
 
                         {variants.length > 0 && (
@@ -331,23 +357,45 @@
           </main>
 
           {selectedProduct && (() => {
-            const productImages = getProductImages(selectedProduct);
-            const currentImg = productImages[activeImageIndex] || selectedProduct.image;
+            const mediaItems = getProductMedia(selectedProduct);
+            const currentMedia = mediaItems[activeMediaIndex] || mediaItems[0];
             
             return (
               <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 overflow-y-auto backdrop-blur-xs">
                 <div className="bg-white rounded-3xl max-w-2xl w-full overflow-hidden shadow-2xl my-auto flex flex-col md:flex-row border border-white/20">
-                  <div className="w-full md:w-1/2 bg-black p-4 flex flex-col justify-center items-center relative">
+                  <div className="w-full md:w-1/2 bg-black p-4 flex flex-col justify-between items-center relative">
                     <div className="h-72 w-full flex items-center justify-center relative group">
-                      <img src={currentImg} className="max-h-full max-w-full object-contain cursor-zoom-in" onClick={() => setFullScreenImage(currentImg)} />
-                      
-                      {productImages.length > 1 && (
-                        <button onClick={(e) => { e.stopPropagation(); setActiveImageIndex(prev => (prev === 0 ? productImages.length - 1 : prev - 1)); }} className="absolute left-2 bg-black/60 text-white w-8 h-8 rounded-full flex items-center justify-center"><i className="fa-solid fa-chevron-left text-xs"></i></button>
+                      {currentMedia.type === 'video' ? (
+                        <video src={currentMedia.url} controls autoPlay className="max-h-full max-w-full rounded-xl" />
+                      ) : (
+                        <img src={currentMedia.url} className="max-h-full max-w-full object-contain cursor-zoom-in" onClick={() => setFullScreenImage(currentMedia.url)} />
                       )}
-                      {productImages.length > 1 && (
-                        <button onClick={(e) => { e.stopPropagation(); setActiveImageIndex(prev => (prev === productImages.length - 1 ? 0 : prev + 1)); }} className="absolute right-2 bg-black/60 text-white w-8 h-8 rounded-full flex items-center justify-center"><i className="fa-solid fa-chevron-right text-xs"></i></button>
+                      
+                      {mediaItems.length > 1 && (
+                        <>
+                          <button onClick={(e) => { e.stopPropagation(); setActiveMediaIndex(prev => (prev === 0 ? mediaItems.length - 1 : prev - 1)); }} className="absolute left-2 bg-black/60 text-white w-8 h-8 rounded-full flex items-center justify-center hover:bg-black"><i className="fa-solid fa-chevron-left text-xs"></i></button>
+                          <button onClick={(e) => { e.stopPropagation(); setActiveMediaIndex(prev => (prev === mediaItems.length - 1 ? 0 : prev + 1)); }} className="absolute right-2 bg-black/60 text-white w-8 h-8 rounded-full flex items-center justify-center hover:bg-black"><i className="fa-solid fa-chevron-right text-xs"></i></button>
+                        </>
                       )}
                     </div>
+
+                    {mediaItems.length > 1 && (
+                      <div className="flex gap-2 mt-3 overflow-x-auto max-w-full pb-1">
+                        {mediaItems.map((m, idx) => (
+                          <button 
+                            key={idx} 
+                            onClick={() => setActiveMediaIndex(idx)}
+                            className={`w-12 h-12 rounded-lg overflow-hidden border-2 flex-shrink-0 flex items-center justify-center bg-gray-900 ${activeMediaIndex === idx ? 'border-[#768C77]' : 'border-transparent opacity-60'}`}
+                          >
+                            {m.type === 'video' ? (
+                              <i className="fa-solid fa-play text-white text-sm"></i>
+                            ) : (
+                              <img src={m.url} className="w-full h-full object-cover" />
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   <div className="w-full md:w-1/2 p-6 md:p-8 flex flex-col justify-between bg-white">
